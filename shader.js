@@ -102,35 +102,34 @@
             vec2 mouse = (u_mouse - 0.5 * u_resolution.xy) / min(u_resolution.x, u_resolution.y);
 
             // Time scaling for dreamy slow drift
-            float t = u_time * 0.22;
+            float t = u_time * 0.16;
 
-            vec2 q, r;
-            float f = pattern(uv * 1.5, q, r, t, mouse);
+            vec2 q = vec2(0.0);
+            vec2 r = vec2(0.0);
+            float f = pattern(uv * 1.6, q, r, t, mouse);
 
-            // Deep Void Palette definition
-            // Deep space void: #030407
-            vec3 c_deepVoid = vec3(0.015, 0.02, 0.035);
-            // Cosmic indigo: #0c102a
-            vec3 c_indigo   = vec3(0.045, 0.06, 0.16);
-            // Ethereal cyan / dream aurora: #00d4ff
-            vec3 c_cyan     = vec3(0.0, 0.78, 0.96);
-            // Luminescent violet / void soul: #9b45f5
-            vec3 c_violet   = vec3(0.58, 0.26, 0.94);
-            // Warm stardust highlight: #ff8ebb
-            vec3 c_stardust = vec3(0.98, 0.52, 0.72);
+            // Vibrant Cosmic Void Palette
+            vec3 c_deepVoid = vec3(0.02, 0.025, 0.045);
+            vec3 c_indigo   = vec3(0.07, 0.09, 0.24);
+            vec3 c_cyan     = vec3(0.0, 0.88, 1.0);
+            vec3 c_violet   = vec3(0.68, 0.28, 1.0);
+            vec3 c_magenta  = vec3(1.0, 0.25, 0.68);
+            vec3 c_core     = vec3(0.85, 0.95, 1.0);
 
-            // Complex multi-layered chromatic blending
-            vec3 color = mix(c_deepVoid, c_indigo, clamp(f * f * 2.8, 0.0, 1.0));
-            color = mix(color, c_violet, clamp(length(q) * 0.65, 0.0, 1.0));
-            color = mix(color, c_cyan, clamp(length(r.x) * 0.52, 0.0, 1.0));
-            color = mix(color, c_stardust, clamp(pow(f, 3.5) * 0.7, 0.0, 1.0));
+            // Multi-layered nebular fluid blending
+            vec3 color = mix(c_deepVoid, c_indigo, clamp(f * 2.2 + 0.35, 0.0, 1.0));
+            color += c_violet * pow(clamp(length(q) * 0.85, 0.0, 1.0), 2.2) * 1.35;
+            color += c_cyan * pow(clamp(length(r) * 0.82, 0.0, 1.0), 2.0) * 1.25;
+            color += c_magenta * pow(clamp(f * 1.5, 0.0, 1.0), 3.0) * 0.95;
+            color += c_core * pow(clamp(f * f, 0.0, 1.0), 4.0) * 0.5;
 
-            // Soft cosmic glow and subtle edge darkening
-            float vignette = 1.0 - smoothstep(0.4, 1.6, length(uv));
-            color *= (0.75 + 0.25 * vignette);
+            // Soft atmospheric vignette
+            float dist = length(uv);
+            float vignette = smoothstep(1.9, 0.35, dist);
+            color *= (0.65 + 0.35 * vignette);
 
-            // Fine stardust grain
-            float grain = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.022;
+            // Subtle stardust grain
+            float grain = (fract(sin(dot(gl_FragCoord.xy + floor(u_time * 6.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.015;
             color += grain;
 
             gl_FragColor = vec4(color, 1.0);
