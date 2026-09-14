@@ -45,13 +45,12 @@
                                -0.577350269189626, 0.024390243902439);
             vec2 i  = floor(v + dot(v, C.yy) );
             vec2 x0 = v -   i + dot(i, C.xx);
-            vec1 i1;
-            vec2 i1_v = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+            vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
             vec4 x12 = x0.xyxy + C.xxzz;
-            x12.xy -= i1_v;
+            x12.xy -= i1;
             i = mod(i, 289.0);
-            vec3 p = permute( permute( i.y + vec3(0.0, i1_v.y, 1.0 ))
-                + i.x + vec3(0.0, i1_v.x, 1.0 ));
+            vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+                + i.x + vec3(0.0, i1.x, 1.0 ));
             vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
                 dot(x12.zw,x12.zw)), 0.0);
             m = m*m ;
