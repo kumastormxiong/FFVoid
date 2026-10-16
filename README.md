@@ -1,34 +1,43 @@
-# FFVoid (虚空造物) - Official Artist Portal
+# FFVoid (虚空造物) - Artist Page
 
-[![Website ffvoid.com](https://img.shields.io/badge/Website-ffvoid.com-00e5ff?style=flat-square)](https://ffvoid.com)
-[![Spotify](https://img.shields.io/badge/Spotify-FFVoid-1ed760?style=flat-square&logo=spotify)](https://open.spotify.com/artist/4697UO1twJkVreMzMQIFo0)
-[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-f38020?style=flat-square&logo=cloudflare)](https://pages.cloudflare.com)
+Official bilingual artist page for FFVoid / 虚空造物.
 
-Official bilingual portfolio and music universe of **FFVoid / 虚空造物**.
+Live: [ffvoid.com](https://ffvoid.com) · [Spotify](https://open.spotify.com/artist/4697UO1twJkVreMzMQIFo0)
 
-## ✨ Features
-- 🌌 **Cosmic Fluid GLSL WebGL Shader**: Domain-warped Fractal Brownian Motion background with real-time interactive mouse gravitational distortion.
-- 🌐 **Seamless Bilingual Experience**: English (Default) & 简体中文 with instant toggle and persistent storage.
-- 🎵 **Spotify Discography Integration**: Featuring all 6 official studio releases with interactive preview modals via official Spotify Embed player.
-- 💎 **Deep Void Aesthetic**: Obsidian dark theme (`#050608`) accented by cyan, violet, and electric dream neon glassmorphism.
-- 📬 **Direct Beacon Contact**: One-click clipboard copy and mailto link for `echos@dreamy.voyage`.
-- ⚡ **Global Edge Delivery**: Optimized for zero-dependency sub-second loading on Cloudflare Pages.
+## Design
 
-## 🎧 Official Discography
-1. **Dreamy.Voyage: Prime 5** (2026-09-07)
-2. **Gameon Album 2** (2026-03-02)
-3. **Gameon Album 1** (2025-11-10)
-4. **Dreamy Voyage (Album 3)** (2025-08-23)
-5. **Dreamy Voyage (Album 2)** (2025-08-22)
-6. **Dreamy Voyage** (2025-08-18)
+- **Void / Signal**: a near-black page with bone-coloured type. Album covers supply the colour.
+- **Signal field**: the hero has a field of hairlines that breathe on their own and bend toward the pointer or finger.
+- **Albums as an index**: hover (desktop) previews the cover. Click opens the Spotify player: beside the list on desktop, under the chosen row on mobile.
+- **Type**: Cormorant Garamond for display, Noto Sans SC for Chinese and body text.
+- **Responsive**: mobile-first, 16px gutter on phones, no horizontal scroll.
+- **Accessibility**: visible focus, reduced motion respected, the signal field stays static under reduced motion.
 
-## 🚀 Local Development
+## Files
+
+- `index.html`: structure and metadata
+- `style.css`: all styling
+- `app.js`: bilingual copy, album index, preview and player logic
+- `signal.js`: hero signal field (canvas)
+- `albums.json`: discography, newest first is handled automatically
+- `assets/covers/`: local cover images
+
+## Adding an album
+
+Add an entry to `albums.json` (copy an existing one). Fields: `id` (Spotify album ID), `title`, `titleZh`, `series` (`dreamy` or `gameon`), `releaseDate` (`YYYY-MM-DD`), `type`, `typeZh`, `trackCount`, `genre`, `genreZh`, `descriptionEn`, `descriptionZh`, `spotifyUrl`, `localCover` (path under `assets/covers/`), `coverUrl` (Spotify CDN fallback). The newest album is automatically featured in the hero.
+
+## Local preview
+
+The page loads `albums.json` with `fetch`, so open it through a local server rather than by double-clicking `index.html`. If the fetch fails, a built-in copy of the discography is used.
+
 ```bash
-# Using Python
 python -m http.server 8080
-
-# Or using Node
+# or
 npx serve .
 ```
 
-Visit `http://localhost:8080` in your browser.
+Then visit `http://localhost:8080`.
+
+## Deploy
+
+Hosted on Cloudflare Pages. Headers are in `_headers`.
