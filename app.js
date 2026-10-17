@@ -660,6 +660,25 @@
             });
         });
 
+        // In-page links: land on the section heading, not the section's top padding.
+        document.addEventListener('click', function (e) {
+            if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+            var link = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+            if (!link) return;
+            var id = link.getAttribute('href').slice(1);
+            var target = id === 'top' ? document.getElementById('top') : document.getElementById(id);
+            if (!target) return;
+            e.preventDefault();
+
+            var heading = target.querySelector('.section-title') || target;
+            var headerH = els.header ? els.header.offsetHeight : 0;
+            var top = id === 'top' ? 0 : heading.getBoundingClientRect().top + window.pageYOffset - headerH - 24;
+            var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            window.scrollTo({ top: Math.max(0, top), behavior: reduce ? 'auto' : 'smooth' });
+            try { history.replaceState(null, '', '#' + id); } catch (err) { /* ignore */ }
+        });
+
         var onScroll = function () {
             els.header.classList.toggle('is-scrolled', window.scrollY > 40);
         };
