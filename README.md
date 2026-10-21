@@ -41,3 +41,7 @@ Then visit `http://localhost:8080`.
 ## Deploy
 
 Hosted on Cloudflare Pages. Headers are in `_headers`.
+
+## /cube
+
+`cube/` hosts the mini game 醒醒吧！方块 (Wake Up, Cubes!) at [ffvoid.com/cube](https://ffvoid.com/cube/). Source of truth: [WakeupCubes-VR](https://github.com/kumastormxiong/WakeupCubes-VR).
