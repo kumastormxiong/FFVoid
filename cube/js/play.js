@@ -3,13 +3,12 @@ import * as THREE from 'three';
 import { BLOCK, computeClues, gridRaycast, rayToGrid, makeVoxelMaterial, getBlockGeometry, getFrameGeometry, VoxelModel } from './voxel.js';
 import { PUZZLE, PALETTE } from './palette.js';
 import { Particles, Sleepy, Cheer } from './fx.js';
-import { analyzeLevel } from './solver.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
 const _c = new THREE.Color(), _c2 = new THREE.Color();
 const COL = {
   base: new THREE.Color(PUZZLE.base), hb: new THREE.Color(PUZZLE.hoverBreak), hp: new THREE.Color(PUZZLE.hoverProtect),
-  prot: new THREE.Color(PUZZLE.protect), err: new THREE.Color(PUZZLE.error), hint: new THREE.Color('#FFE7A0'),
+  prot: new THREE.Color(PUZZLE.protect), err: new THREE.Color(PUZZLE.error),
 };
 const CONFETTI = PALETTE.slice(2, 19).map(p => p.c);
 
@@ -54,16 +53,6 @@ export class PlayMode {
     }
     this.total = this.cells.filter(c => !c.t).length;
     this.remaining = this.total;
-    // 推不出来的关卡：自动给出最少量的提示方块（金框），保证不用猜
-    this.hintKeep = 0; this.hintRemoved = 0;
-    try {
-      const an = analyzeLevel(L);
-      for (const hnt of an.hints) {
-        const c = this.cells[hnt.i];
-        if (hnt.target) { c.prot = true; c.hint = true; this.hintKeep++; }
-        else { c.alive = false; this.remaining--; this.hintRemoved++; }
-      }
-    } catch (e) { console.warn('提示计算失败', e); }
 
     const clues = computeClues(W, H, D, (x, y, z) => this.cells[this.idx(x, y, z)].t);
     const geo = getBlockGeometry().clone();
@@ -72,8 +61,7 @@ export class PlayMode {
     this.mesh = new THREE.InstancedMesh(geo, this.mat, N);
     this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.frames = new THREE.InstancedMesh(getFrameGeometry(), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.92 }), N);
-    this.frames.setColorAt(0, _c.set(PUZZLE.frame));
+    this.frames = new THREE.InstancedMesh(getFrameGeometry(), new THREE.MeshBasicMaterial({ color: PUZZLE.frame, transparent: true, opacity: 0.9 }), N);
     this.frames.frustumCulled = false;
     this.frames.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.pos = new Array(N);
@@ -90,7 +78,6 @@ export class PlayMode {
     this.particles.clear();
     this.refreshAll();
     this.emit();
-    if (this.remaining <= 0) setTimeout(() => { if (this.state === 'playing' && this.entry === entry) this.win(); }, 800);
   }
 
   idx(x, y, z) { return x + this.W * (y + this.H * z); }
@@ -108,7 +95,6 @@ export class PlayMode {
     const f = this.flash.get(i);
     if (f !== undefined) return _c.copy(COL.err).lerp(c.prot ? COL.prot : COL.base, Math.min(1, f / 0.6));
     if (i === this.hover && this.state === 'playing') return _c.copy(this.tool === 'protect' ? COL.hp : COL.hb);
-    if (c.hint) return _c.copy(COL.hint);
     return _c.copy(c.prot ? COL.prot : COL.base);
   }
 
@@ -131,15 +117,10 @@ export class PlayMode {
     let k = 0;
     if (this.state === 'playing') {
       for (let i = 0; i < this.N; i++) {
-        if (this.cells[i].prot && this.visible(i)) {
-          _m.makeTranslation(this.pos[i].x, this.pos[i].y, this.pos[i].z);
-          this.frames.setColorAt(k, _c.set(this.cells[i].hint ? '#FFB703' : PUZZLE.frame));
-          this.frames.setMatrixAt(k++, _m);
-        }
+        if (this.cells[i].prot && this.visible(i)) { _m.makeTranslation(this.pos[i].x, this.pos[i].y, this.pos[i].z); this.frames.setMatrixAt(k++, _m); }
       }
     }
     this.frames.count = k;
-    if (this.frames.instanceColor) this.frames.instanceColor.needsUpdate = true;
     this.frames.instanceMatrix.needsUpdate = true;
     this.framesDirty = false;
   }
@@ -289,7 +270,6 @@ export class PlayMode {
   toggleProtect(i) {
     const c = this.cells[i];
     if (!c.alive) return;
-    if (c.hint) { this.app.audio.play('bonk'); return; }
     c.prot = !c.prot;
     this.app.audio.play(c.prot ? 'protect' : 'unprotect');
     this.writeInstance(i); this.flush();
@@ -397,7 +377,7 @@ export class PlayMode {
   stateInfo() {
     return {
       state: this.state, tool: this.tool, lives: this.lives, maxLives: this.maxLives, casual: this.casual,
-      remaining: this.remaining, total: this.total, hintKeep: this.hintKeep, hintRemoved: this.hintRemoved, time: this.elapsed, mistakes: this.mistakes,
+      remaining: this.remaining, total: this.total, time: this.elapsed, mistakes: this.mistakes,
       slice: (this.slice || [0, 0, 0]).slice(), dims: [this.W, this.H, this.D], entry: this.entry, result: this.result,
     };
   }
