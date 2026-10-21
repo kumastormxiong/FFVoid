@@ -13,6 +13,7 @@ import { THEMES, PALETTE, PARTS } from './palette.js';
 import { encodeLevel, decodeLevel, shareLink, siteUrl } from './codec.js';
 import { makeShareCard, shareCanvas, thumbnail, fmtTime, canvasToBlob, downloadBlob } from './share.js';
 import { CONFIG } from './config.js';
+import { analyzeLevel } from './solver.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -229,6 +230,13 @@ function startLevel(entry, ctx = {}) {
   clearTimeout(app.hintTimer);
   app.hintTimer = setTimeout(() => hint.classList.add('fade'), 5000);
   setTool('break');
+  const pi = app.play.stateInfo();
+  if (pi.hintKeep || pi.hintRemoved) {
+    const parts = [];
+    if (pi.hintKeep) parts.push(`${pi.hintKeep} 个金框方块一定要保留`);
+    if (pi.hintRemoved) parts.push(`已帮你敲掉 ${pi.hintRemoved} 个`);
+    setTimeout(() => toast(`💡 这关光靠数字推不出唯一答案，送你提示：${parts.join('，')}`, 4200), 900);
+  }
   if (!localStorage.getItem('wuc.howto')) { localStorage.setItem('wuc.howto', '1'); setTimeout(showHowto, 400); }
 }
 app.startLevel = startLevel;
@@ -559,6 +567,14 @@ function syncCreatorUI() {
   $$('#crPalette .swatch').forEach(b => b.classList.toggle('active', b.dataset.c.toLowerCase() === String(cr.color).toLowerCase()));
   $$('#crParts .part').forEach(b => b.classList.toggle('active', +b.dataset.p === cr.part));
   const st = cr.stats();
+  const sv = $('#crSolve');
+  if (sv) {
+    const a = app.crAnalysis;
+    if (!st.count) { sv.className = 'cr-solve'; sv.textContent = '放几个方块，我会检查能不能纯推理解开'; }
+    else if (!a) { sv.className = 'cr-solve'; sv.textContent = '检查中…'; }
+    else if (!a.hints.length) { sv.className = 'cr-solve ok'; sv.textContent = '✓ 可以纯推理解开，不用猜'; }
+    else { sv.className = 'cr-solve warn'; sv.textContent = `⚠ 有 ${a.unknownBefore} 格推不出来，游戏会自动送 ${a.hints.length} 个提示方块。可以试试调整造型让它更好推理～`; }
+  }
   $('#crStats').textContent = `${st.count} 个方块 / ${st.total} 格 · 需要敲掉 ${st.total - st.count} 块`;
   $('#crPreview').lastChild.textContent = cr.preview ? '停止预览' : '预览唤醒动画';
   $('#crUndo').style.opacity = cr.undoStack.length ? 1 : 0.4;
@@ -572,7 +588,18 @@ function saveDraft() {
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify(app.creator.toEntry())); } catch (e) { /* */ }
   }, 400);
 }
-app.onCreatorChange = (cr, pickOnly) => { if (app.screen === 'creator') { syncCreatorUI(); if (app.world && app.world.isXR) updateVRPanel(); } if (!pickOnly) saveDraft(); };
+let anaTimer = 0;
+function scheduleAnalysis() {
+  app.crAnalysis = null;
+  clearTimeout(anaTimer);
+  anaTimer = setTimeout(() => {
+    const e = app.creator.toEntry();
+    app.crAnalysis = e.data.voxels.length ? analyzeLevel(e.data) : null;
+    if (app.screen === 'creator') { syncCreatorUI(); if (app.world && app.world.isXR) updateVRPanel(); }
+  }, 500);
+}
+app.onCreatorChange = (cr, pickOnly) => {
+  if (!pickOnly) scheduleAnalysis(); if (app.screen === 'creator') { syncCreatorUI(); if (app.world && app.world.isXR) updateVRPanel(); } if (!pickOnly) saveDraft(); };
 
 function validateDoc() {
   const st = app.creator.stats();
@@ -879,7 +906,7 @@ function vrCreatorPanel(panel) {
   btns.push(...rowButtons(790, [{ id: 'home', label: '回主页', size: 30 }, { id: 'exit', label: '退出 VR', size: 30 }], { h: 76 }));
   panel.set({
     title: '造物工坊 · ' + (d.name || ''), sub: `${st.count} 块`, height: 900,
-    info: `${d.w}×${d.h}×${d.d} · 扳机=当前工具 · 侧握键=擦除 · 摇杆=旋转`,
+    info: `${d.w}×${d.h}×${d.d} · ` + (app.crAnalysis ? (app.crAnalysis.hints.length ? `⚠ 需要 ${app.crAnalysis.hints.length} 个提示方块` : '✓ 可纯推理解开') : '扳机=当前工具 · 侧握键=擦除'),
     buttons: btns,
   }, onVRPress);
 }
