@@ -641,7 +641,7 @@ function renderAdmin() {
   const done = store.completedIds().length;
   const stars = Object.values(store.data.progress).reduce((a, p) => a + (p.stars || 0), 0);
   $('#adminStats').innerHTML = `<div><b>${lv.length}</b>关卡总数</div><div><b>${done}</b>已通关</div><div><b>${stars}</b>获得星星</div>`;
-  $('#adminVersion').textContent = '游戏版本 v' + CONFIG.VERSION;
+  $('#adminVersion').textContent = 'v' + CONFIG.VERSION;
   const tb = $('#adminTable');
   tb.innerHTML = '';
   lv.forEach((L, i) => {
