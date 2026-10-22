@@ -641,6 +641,7 @@ function renderAdmin() {
   const done = store.completedIds().length;
   const stars = Object.values(store.data.progress).reduce((a, p) => a + (p.stars || 0), 0);
   $('#adminStats').innerHTML = `<div><b>${lv.length}</b>关卡总数</div><div><b>${done}</b>已通关</div><div><b>${stars}</b>获得星星</div>`;
+  $('#adminVersion').textContent = '游戏版本 v' + CONFIG.VERSION;
   const tb = $('#adminTable');
   tb.innerHTML = '';
   lv.forEach((L, i) => {
@@ -754,7 +755,7 @@ function updateVRPanel() {
     const done = off.filter(l => store.progress(l.id)).length;
     panel.set({
       title: CONFIG.GAME_NAME, sub: `${done}/${off.length} 已唤醒`,
-      info: '欢迎来到方块岛！选一项开始吧',
+      info: `欢迎来到方块岛！选一项开始吧 · v${CONFIG.VERSION}`,
       buttons: [
         ...rowButtons(170, [{ id: 'play', label: '继续闯关 ▶', active: true }, { id: 'levels', label: '选择关卡' }], { h: 110 }),
         ...rowButtons(305, [{ id: 'create', label: '创造关卡', active: true, color: '#FFCB3D' }, { id: 'coll', label: '收藏室' }], { h: 110 }),
