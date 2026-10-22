@@ -809,7 +809,7 @@ function vrPlayPanel(panel) {
           ? [{ id: 'again', label: '重来', size: 32 }, { id: 'backcr', label: '返回工坊', size: 32 }]
           : [{ id: 'prev', label: '◀ 上一关', size: 32 }, { id: 'again', label: '重来', size: 32 }, { id: 'next', label: '下一关 ▶', size: 32 }], { h: 84 }),
         ...rowButtons(498, [{ id: 'levels', label: '选择关卡', size: 32 }, { id: 'home', label: '回主页', size: 32 }], { h: 84 }),
-        ...rowButtons(606, [{ id: 'exit', label: '退出 VR', size: 32 }], { h: 80, x0: 300, x1: 724 }),
+        ...rowButtons(606, [{ id: 'resize', label: '重置大小', size: 30 }, { id: 'exit', label: '退出 VR', size: 30 }], { h: 80 }),
       ],
     }, onVRPress);
   }
@@ -948,6 +948,7 @@ function onVRPress(id) {
   else if (id === 'cpreview') { if (cr.preview) cr.stopPreview(); else if (!cr.startPreview()) toast('先放几个方块吧～'); }
   else if (id === 'ctest') { const err = validateDoc(); if (err) toast(err); else startLevel(cr.toEntry(), { from: 'creator', test: true }); }
   else if (id === 'csave') vrSaveCreator();
+  else if (id === 'resize') app.play.resetVRScale();
   else if (id === 'exit') app.world.exitVR();
   if (app.screen === 'creator') syncCreatorUI();
   updateVRPanel();

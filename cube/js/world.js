@@ -339,6 +339,8 @@ export class World {
       c.addEventListener('disconnected', () => { c.userData.gamepad = null; });
       c.addEventListener('selectstart', () => this.onXRAction(c, 'select'));
       c.addEventListener('squeezestart', () => this.onXRAction(c, 'squeeze'));
+      c.addEventListener('selectend', () => this.onXRRelease(c, 'select'));
+      c.addEventListener('squeezeend', () => this.onXRRelease(c, 'squeeze'));
       this.scene.add(c);
       const grip = r.xr.getControllerGrip(i);
       const body = new THREE.Group();
@@ -395,6 +397,11 @@ export class World {
       if (hit) { if (type === 'select') this.vrPanel.press(hit); return; }
     }
     if (this.mode && this.mode.onXRAction) this.mode.onXRAction(ray, type, c.userData);
+  }
+
+  // 松开按键时通知当前模式（只有需要的模式才处理，首页/工坊等不受影响）
+  onXRRelease(c, type) {
+    if (this.mode && this.mode.onXRRelease) this.mode.onXRRelease(this.controllerRay(c), type, c.userData);
   }
 
   updateXR(dt) {

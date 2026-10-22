@@ -101,6 +101,8 @@ export function buildAtlas() {
 
 const VERT = /* glsl */`
 attribute vec3 aClue;
+attribute vec3 aSolved;
+varying vec3 vSol;
 varying vec3 vColor;
 varying vec3 vN;
 varying vec3 vP;
@@ -113,6 +115,7 @@ void main(){
   #endif
   vColor = col;
   vClue = aClue;
+  vSol = aSolved;
   vP = position;
   vLN = normal;
   mat4 m = modelMatrix;
@@ -126,6 +129,8 @@ void main(){
 const FRAG = /* glsl */`
 uniform sampler2D uAtlas;
 uniform float uClue;
+uniform float uSolve;
+varying vec3 vSol;
 uniform float uSize;
 uniform vec3 uLightDir;
 uniform vec3 uSky;
@@ -160,6 +165,9 @@ void main(){
   vec3 c = base * (amb * 0.66 + dif * 0.46);
   // 柔和的高光边缘
   c += vec3(0.05) * pow(1.0 - abs(N.y), 3.0);
+  // 这一排的数量已经敲对：该方向的面泛绿
+  float sol = (an.x >= an.y && an.x >= an.z) ? vSol.x : ((an.y >= an.z) ? vSol.y : vSol.z);
+  if (uSolve > 0.5 && sol > 0.5) c = mix(c, vec3(0.078, 0.672, 0.216), 0.6);
   if (uClue > 0.001 && cell < 62.5) {
     float col = mod(cell, 8.0);
     float row = floor(cell / 8.0 + 0.001);
@@ -176,6 +184,7 @@ export function makeVoxelMaterial(clue = 0) {
     uniforms: {
       uAtlas: { value: atlasTex },
       uClue: { value: clue },
+      uSolve: { value: 0 },
       uSize: { value: BLOCK },
       uTint: { value: new THREE.Color('#ffffff') },
       uTintAmt: { value: 0 },
