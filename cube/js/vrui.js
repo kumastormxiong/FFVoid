@@ -64,6 +64,7 @@ export class VRPanel {
     const g = this.g, s = this.spec, H = this.H;
     g.clearRect(0, 0, W, H);
     if (!s) return;
+    const T = s.top || 0;   // 顶部留出的空白（用于说明条）
     rr(g, 8, 8, W - 16, H - 16, 48);
     g.fillStyle = 'rgba(255,255,255,0.92)'; g.fill();
     g.lineWidth = 6; g.strokeStyle = 'rgba(255,182,206,0.9)'; g.stroke();
@@ -72,20 +73,32 @@ export class VRPanel {
     g.font = '60px "ZCOOL KuaiLe", "Baloo 2", sans-serif';
     let title = s.title || '';
     while (g.measureText(title).width > 700 && title.length > 2) title = title.slice(0, -2) + '…';
-    g.fillText(title, 48, 70);
+    g.fillText(title, 48, 70 + T);
     if (s.sub) {
       g.font = '700 34px "Baloo 2", "ZCOOL KuaiLe", sans-serif';
       g.fillStyle = '#FF6F9C';
       g.textAlign = 'right';
-      g.fillText(s.sub, W - 48, 72);
+      g.fillText(s.sub, W - 48, 72 + T);
     }
     if (s.info) {
       g.textAlign = 'left';
       g.font = '30px "ZCOOL KuaiLe", sans-serif';
       g.fillStyle = '#8C86A0';
-      g.fillText(s.info, 48, 128);
+      g.fillText(s.info, 48, 128 + T);
     }
-    for (const b of s.buttons || []) {
+    if (s.hint) {
+      g.font = '28px "ZCOOL KuaiLe", sans-serif';
+      g.textAlign = 'center';
+      let hint = s.hint;
+      while (g.measureText(hint).width > W - 180 && hint.length > 2) hint = hint.slice(0, -2) + '…';
+      const tw = g.measureText(hint).width + 56;
+      rr(g, W / 2 - tw / 2, 24, tw, 46, 23);
+      g.fillStyle = 'rgba(255,214,228,0.95)'; g.fill();
+      g.fillStyle = '#5A4A86';
+      g.fillText(hint, W / 2, 47);
+      g.textAlign = 'left';
+    }
+    for (const b of (s.buttons || []).map(q => ({ ...q, y: q.y + T }))) {
       const hov = this.hoverId === b.id;
       const r = Math.min(30, b.h / 2);
       if (b.swatch) {
@@ -134,8 +147,9 @@ export class VRPanel {
     const uv = hits[0].uv;
     const px = uv.x * W, py = (1 - uv.y) * this.H;
     let id = '__panel';
+    const T = (this.spec && this.spec.top) || 0;
     for (const b of (this.spec && this.spec.buttons) || []) {
-      if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { id = b.id; break; }
+      if (px >= b.x && px <= b.x + b.w && py >= b.y + T && py <= b.y + T + b.h) { id = b.id; break; }
     }
     return { id, distance: hits[0].distance };
   }

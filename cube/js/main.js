@@ -204,6 +204,7 @@ function renderLevels() {
 // ---------- 游戏 ----------
 function startLevel(entry, ctx = {}) {
   app.playCtx = { from: 'levels', ...ctx, entry };
+  app.vrPanelHidden = false;   // 每次进关默认显示 VR 面板
   const cfg = store.config;
   app.play.load(entry, { casual: cfg.casual, lives: cfg.lives, speed: cfg.animSpeed });
   app.world.setMode(app.play);
@@ -734,7 +735,7 @@ app.vrTplIndex = -1;
 function updateVRPanel() {
   const panel = app.vrPanel;
   if (!panel || !app.world.isXR) return;
-  panel.show(true);
+  panel.show(!app.vrPanelHidden);
   if (app.screen === 'play') vrPlayPanel(panel);
   else if (app.screen === 'collection') {
     panel.set({
@@ -762,6 +763,9 @@ function updateVRPanel() {
     }, onVRPress);
   }
 }
+
+// 左手 X/Y 键：隐藏 / 显示左侧 VR 面板
+app.toggleVRPanel = () => { app.vrPanelHidden = !app.vrPanelHidden; updateVRPanel(); };
 
 function vrPlayPanel(panel) {
   const info = app.play.stateInfo();
@@ -793,7 +797,8 @@ function vrPlayPanel(panel) {
     }, onVRPress);
   } else {
     panel.set({
-      title: displayName(e), sub: hearts, height: 740,
+      title: displayName(e), sub: hearts, height: 796, top: 56,
+      hint: '左手 X/Y：隐藏/显示面板 ｜ 右手 A/B：切换工具 ｜ 双手侧握：缩放',
       info: `还要敲 ${info.remaining} 块 · ${fmtTime(info.time)} · 切片 X${info.slice[0]} Y${info.slice[1]} Z${info.slice[2]}`,
       buttons: [
         ...rowButtons(165, [

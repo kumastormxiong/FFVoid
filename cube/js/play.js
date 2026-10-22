@@ -7,7 +7,7 @@ import { RoundedBoxGeometry } from '../vendor/addons/RoundedBoxGeometry.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
 const _c = new THREE.Color(), _c2 = new THREE.Color();
-const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3();
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
 const nowMs = () => performance.now();
 const COL = {
   base: new THREE.Color(PUZZLE.base), hb: new THREE.Color(PUZZLE.hoverBreak), hp: new THREE.Color(PUZZLE.hoverProtect),
@@ -249,8 +249,10 @@ export class PlayMode {
     if (ray.distanceToPoint(c) < this.model.radius * s) { this.model.jump(); this.app.audio.play('jump'); }
   }
 
-  onXRHover(ray) {
+  onXRHover(ray, idx) {
     if (this.state !== 'playing') return null;
+    // 拿着小木槌时不再显示指向的黄色提示
+    if (idx !== undefined && this.hand[idx] && this.hand[idx].hammer) return null;
     const h = this.pick(ray);
     this.setHover(h ? h.i : -1);
     if (!h) return null;
@@ -322,7 +324,7 @@ export class PlayMode {
     const cs = this.world.controllers;
     if (this.scaleStart) {
       const d = cs[0].getWorldPosition(_v1).distanceTo(cs[1].getWorldPosition(_v2));
-      this.setVRScale(THREE.MathUtils.clamp(this.scaleStart.s0 * d / this.scaleStart.d0, 0.35, 3));
+      this.setVRScale(THREE.MathUtils.clamp(this.scaleStart.s0 * d / this.scaleStart.d0, 0.25, 5));
     }
     const now = nowMs();
     for (let h = 0; h < 2; h++) {
@@ -358,7 +360,8 @@ export class PlayMode {
     this.ensureHammers();
     if (!this.hammers) return;
     const H = this.hand[h], c = this.world.controllers[h];
-    H.hammer = true; H.prev = null; H.cool = 0;
+    H.hammer = true; H.prev = null;
+    this.setHover(-1);
     this.hammers[h].visible = true;
     c.userData.line.visible = false; c.userData.tip.visible = false;
     this.buzz(h, 0.35, 40);
@@ -371,27 +374,41 @@ export class PlayMode {
     if (c) { c.userData.line.visible = true; c.userData.tip.visible = true; }
   }
 
-  // 锤头碰到方块，并且挥动速度够快，就敲掉离锤头最近的一块（已保护的方块不会被敲）
+  // 锤头沿“上一帧 → 这一帧”的线段检测：快速挥过的方块会按先后顺序全部敲掉（已保护的不敲）
+  // 挥得很慢（低于 0.8 米/秒）不会误敲；一次挥击中敲错一块就停下
   hammerStrike(h, dt) {
     const H = this.hand[h];
     const wp = this.hammers[h].userData.head.getWorldPosition(_v1);
-    H.cool = Math.max(0, H.cool - dt);
-    const speed = H.prev ? wp.distanceTo(H.prev) / Math.max(dt, 1e-3) : 0;
-    if (!H.prev) H.prev = new THREE.Vector3();
-    H.prev.copy(wp);
-    if (this.scaleStart || H.cool > 0 || speed < 0.8) return;
-    const s = this.puzzle.getWorldScale(_v2).x;
-    this.puzzle.worldToLocal(wp);
-    let best = -1, bd = BLOCK / 2 + 0.05 / s;
-    for (let i = 0; i < this.N; i++) {
-      const c = this.cells[i];
-      if (!c.alive || c.prot || !this.visible(i)) continue;
-      const d = this.pos[i].distanceTo(wp);
-      if (d < bd) { bd = d; best = i; }
+    if (!H.prev) H.prev = new THREE.Vector3().copy(wp);
+    const speed = wp.distanceTo(H.prev) / Math.max(dt, 1e-3);
+    if (!this.scaleStart && speed >= 0.8) {
+      const s = this.puzzle.getWorldScale(_v2).x;
+      const A = _a.copy(H.prev), B = _b.copy(wp);
+      this.puzzle.worldToLocal(A);
+      this.puzzle.worldToLocal(B);
+      const R = BLOCK / 2 + 0.05 / s;
+      const dx = B.x - A.x, dy = B.y - A.y, dz = B.z - A.z;
+      const L2 = Math.max(dx * dx + dy * dy + dz * dz, 1e-8);
+      const hits = [];
+      for (let i = 0; i < this.N; i++) {
+        const c = this.cells[i];
+        if (!c.alive || c.prot || !this.visible(i)) continue;
+        const P = this.pos[i];
+        let t = ((P.x - A.x) * dx + (P.y - A.y) * dy + (P.z - A.z) * dz) / L2;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const ex = A.x + dx * t - P.x, ey = A.y + dy * t - P.y, ez = A.z + dz * t - P.z;
+        if (ex * ex + ey * ey + ez * ez < R * R) hits.push({ t, i });
+      }
+      hits.sort((p, q) => p.t - q.t);
+      for (const { i } of hits) {
+        if (this.state !== 'playing') break;
+        if (!this.cells[i].alive || this.cells[i].prot) continue;
+        const m0 = this.mistakes;
+        this.vrBreak(i, h);
+        if (this.mistakes > m0) break;
+      }
     }
-    if (best < 0) return;
-    H.cool = 0.25;
-    this.vrBreak(best, h);
+    H.prev.copy(wp);
   }
 
   // VR 里敲一下：敲对了震动一下，敲错了震得更强
@@ -414,7 +431,9 @@ export class PlayMode {
       }
     } catch (e) { /* 设备不支持震动就忽略 */ }
   }
-  onXRButton(name) {
+  onXRButton(name, ud) {
+    // 左手 X/Y：隐藏 / 显示左侧面板；右手 A/B：切换敲除 / 保护工具
+    if (ud && ud.handedness === 'left') { if (this.app.toggleVRPanel) this.app.toggleVRPanel(); return; }
     if (name === 'a' || name === 'b') this.setTool(this.tool === 'break' ? 'protect' : 'break');
   }
   onXRStick(sx, sy, dt) {
