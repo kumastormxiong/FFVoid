@@ -1,4 +1,4 @@
-// 10 个官方关卡的程序化体素生成器
+// 30 个官方关卡的程序化体素生成器
 // 坐标约定：x 向右，y 向上，z 朝向玩家（z 最大的一面是“正面”）
 import { C } from './palette.js';
 
@@ -267,15 +267,265 @@ function airship() {
   return b.done();
 }
 
+// Lv.11 小雪人 5x6x5
+function snowman() {
+  const b = builder(5, 6, 5);
+  b.box(1, 0, 1, 3, 1, 3, C.white);
+  b.box(1, 2, 1, 3, 3, 3, C.white);
+  b.box(1, 4, 1, 3, 4, 3, C.taro);
+  b.paintFront(1, 3, C.ink).paintFront(3, 3, C.ink);
+  b.paintFront(2, 2, C.orange);
+  return b.done();
+}
+
+// Lv.12 小星星 5x5x3
+function star() {
+  const b = builder(5, 5, 3);
+  const rows = ['..#..', '#####', '.###.', '##.##', '#...#'];
+  rows.forEach((s, r) => {
+    const y = 4 - r;
+    for (let x = 0; x < 5; x++) if (s[x] === '#') b.box(x, y, 0, x, y, 2, C.lemon);
+  });
+  b.paintFront(1, 3, C.ink).paintFront(3, 3, C.ink);
+  return b.done();
+}
+
+// Lv.13 小蝌蚪 6x4x4
+function tadpole() {
+  const b = builder(6, 4, 4);
+  b.ell(1.5, 1.5, 1.5, 1.7, 1.7, 1.7, C.ocean);
+  b.box(4, 1, 1, 5, 2, 2, C.ocean);
+  b.paintFront(1, 1, C.ink);
+  return b.done();
+}
+
+// Lv.14 小房子 5x5x5
+function house() {
+  const b = builder(5, 5, 5);
+  b.box(0, 0, 0, 4, 2, 4, C.cream);
+  b.box(1, 3, 1, 3, 3, 3, C.strawberry);
+  b.set(2, 4, 2, C.strawberry);
+  b.set(2, 0, 4, C.cocoa).set(1, 2, 4, C.sky).set(3, 2, 4, C.sky);
+  return b.done();
+}
+
+// Lv.15 小南瓜 6x6x6
+function pumpkin() {
+  const b = builder(6, 6, 6);
+  b.ell(2.5, 2, 2.5, 2.9, 2, 2.9, C.orange);
+  b.recolor((x) => (x % 2 === 0 ? C.tangerine : null));
+  b.set(2, 5, 2, C.grass);
+  b.paintFront(1, 2, C.ink).paintFront(4, 2, C.ink);
+  return b.done();
+}
+
+// Lv.16 马卡龙 6x4x6
+function macaron() {
+  const b = builder(6, 4, 6);
+  b.rbox(0, 0, 0, 5, 0, 5, C.blush);
+  b.box(1, 1, 1, 4, 2, 4, C.cream);
+  b.rbox(0, 3, 0, 5, 3, 5, C.blush);
+  return b.done();
+}
+
+// Lv.17 热气球 6x7x6
+function balloon() {
+  const b = builder(6, 7, 6);
+  b.ell(2.5, 4, 2.5, 2.6, 2.6, 2.6, C.lilac);
+  b.recolor((x) => (x % 2 === 0 ? C.butter : null));
+  b.box(2, 0, 2, 3, 0, 3, C.cocoa);
+  b.set(2, 1, 2, C.ink).set(3, 1, 3, C.ink);
+  return b.done();
+}
+
+// Lv.18 樱花树 6x8x6
+function cherry() {
+  const b = builder(6, 8, 6);
+  b.box(2, 0, 2, 3, 3, 3, C.cocoa);
+  b.ell(2.5, 5.5, 2.5, 2.9, 2.2, 2.9, C.sakura);
+  b.recolor((x, y, z) => ((x + y + z) % 3 === 0 ? C.white : null));
+  return b.done();
+}
+
+// Lv.19 小飞机 7x5x7
+function airplane() {
+  const b = builder(7, 5, 7);
+  b.box(2, 1, 0, 4, 2, 6, C.ice);
+  b.box(0, 1, 2, 6, 1, 3, C.blush);
+  b.box(3, 3, 0, 3, 4, 1, C.blush);
+  b.set(3, 2, 6, C.sky);
+  return b.done();
+}
+
+// Lv.20 童话城堡 7x7x7
+function castle() {
+  const b = builder(7, 7, 7);
+  b.box(1, 0, 1, 5, 2, 5, C.cream);
+  b.box(0, 0, 0, 1, 4, 1, C.sky).box(5, 0, 0, 6, 4, 1, C.sky);
+  b.box(0, 0, 5, 1, 4, 6, C.sky).box(5, 0, 5, 6, 4, 6, C.sky);
+  b.box(2, 3, 2, 4, 6, 4, C.sakura);
+  b.set(3, 0, 5, C.cocoa).set(3, 1, 5, C.cocoa);
+  return b.done();
+}
+
+// Lv.21 灯塔 6x8x6
+function lighthouse() {
+  const b = builder(6, 8, 6);
+  b.box(1, 0, 1, 4, 5, 4, C.white);
+  b.recolor((x, y) => (y % 2 === 1 ? C.strawberry : null));
+  b.box(0, 0, 0, 5, 0, 5, C.cocoa);
+  b.box(1, 6, 1, 4, 6, 4, C.ice);
+  b.box(2, 7, 2, 3, 7, 3, C.strawberry);
+  b.paintFront(2, 6, C.lemon);
+  return b.done();
+}
+
+// Lv.22 小蜗牛 7x5x5
+function snail() {
+  const b = builder(7, 5, 5);
+  b.box(0, 0, 1, 6, 0, 3, C.cream);
+  b.ell(3, 2, 2, 2.2, 2, 2, C.butter);
+  b.recolor((x, y, z, c) => (c === C.butter && (x + y + z) % 2 === 0 ? C.gold : null));
+  b.set(6, 1, 2, C.lilac).set(6, 2, 2, C.lilac).set(6, 3, 2, C.ink);
+  return b.done();
+}
+
+// Lv.23 小熊 8x8x8
+function bear() {
+  const b = builder(8, 8, 8);
+  b.ell(3.5, 1.8, 3.5, 2.6, 1.8, 2.6, C.cocoa);
+  b.ell(3.5, 5, 3.5, 2.9, 2.5, 2.6, C.cocoa);
+  b.ell(0.8, 7.2, 3.5, 1.1, 1.1, 1.1, C.cocoa);
+  b.ell(6.2, 7.2, 3.5, 1.1, 1.1, 1.1, C.cocoa);
+  b.ell(3.5, 4, 6, 1.6, 1.2, 1.0, C.cream, 0, (x, y, z) => z >= 4);
+  b.paintFront(2, 6, C.ink).paintFront(5, 6, C.ink);
+  b.paintFront(3, 4, C.ink).paintFront(4, 4, C.ink);
+  return b.done();
+}
+
+// Lv.24 小火箭 8x9x8
+function rocket() {
+  const b = builder(8, 9, 8);
+  b.ell(3.5, 4.2, 3.5, 2.6, 3.6, 2.6, C.white);
+  b.box(3, 8, 3, 4, 8, 4, C.strawberry);
+  b.box(3, 0, 3, 4, 0, 4, C.lemon);
+  b.box(0, 2, 3, 0, 4, 4, C.blush);
+  b.box(7, 2, 3, 7, 4, 4, C.blush);
+  b.paintFront(3, 5, C.sky).paintFront(4, 5, C.sky).paintFront(3, 4, C.sky).paintFront(4, 4, C.sky);
+  return b.done();
+}
+
+// Lv.25 棉花云 9x6x8
+function cloud() {
+  const b = builder(9, 6, 8);
+  b.ell(2.5, 2.2, 3.5, 2.5, 2.0, 2.5, C.white);
+  b.ell(5.8, 2.0, 3.5, 2.8, 2.2, 2.8, C.white);
+  b.ell(4.2, 3.4, 3.5, 2.2, 2.2, 2.4, C.white);
+  b.recolor((x, y) => (y === 0 ? C.ice : null));
+  b.paintFront(2, 2, C.ink).paintFront(6, 2, C.ink);
+  b.paintFront(1, 1, C.blush).paintFront(7, 1, C.blush);
+  return b.done();
+}
+
+// Lv.26 小雏菊 9x9x5
+function flower() {
+  const b = builder(9, 9, 5);
+  b.ell(4, 4, 2, 1.6, 1.6, 1.6, C.lemon);
+  for (let k = 0; k < 6; k++) {
+    const a = (k * Math.PI) / 3;
+    b.ell(4 + 2.9 * Math.cos(a), 4 + 2.9 * Math.sin(a), 2, 1.5, 1.5, 1.3, C.sakura);
+  }
+  b.box(4, 0, 2, 4, 2, 2, C.grass);
+  b.set(3, 1, 2, C.mint).set(5, 1, 2, C.mint);
+  b.paintFront(3, 4, C.ink).paintFront(5, 4, C.ink);
+  return b.done();
+}
+
+// Lv.27 摩天轮 11x12x4
+function ferris() {
+  const b = builder(11, 12, 4);
+  const cx = 5, cy = 6;
+  for (let x = 0; x < 11; x++) for (let y = 0; y < 12; y++) {
+    const r = Math.hypot(x - cx, y - cy);
+    if (r >= 3.4 && r <= 4.5) for (let z = 1; z <= 2; z++) b.set(x, y, z, C.strawberry);
+    const spoke = (x === cx || y === cy || Math.abs(x - cx) === Math.abs(y - cy));
+    if (r < 3.4 && spoke) for (let z = 1; z <= 2; z++) b.set(x, y, z, C.butter);
+  }
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4;
+    b.set(Math.round(cx + 4 * Math.cos(a)), Math.round(cy + 4 * Math.sin(a)), 0, C.blush);
+  }
+  b.box(4, 0, 1, 6, 0, 2, C.cocoa);
+  b.box(5, 1, 1, 5, 1, 2, C.cocoa);
+  return b.done();
+}
+
+// Lv.28 飞碟 11x8x11
+function ufo() {
+  const b = builder(11, 8, 11);
+  b.ell(5, 2, 5, 4.8, 1.6, 4.8, C.lilac);
+  b.recolor((x, y, z) => (y === 1 && (x + z) % 2 === 0 ? C.lemon : null));
+  b.ell(5, 4.2, 5, 2.4, 2.2, 2.4, C.ice);
+  return b.done();
+}
+
+// Lv.29 彩虹桥 12x7x4
+function rainbow() {
+  const b = builder(12, 7, 4);
+  const cols = [C.strawberry, C.butter, C.mint];
+  for (let x = 0; x < 12; x++) for (let y = 0; y < 7; y++) {
+    const r = Math.hypot(x - 5.5, y);
+    if (r < 3.5 || r > 6.5) continue;
+    const band = Math.min(2, Math.floor(r - 3.5));
+    for (let z = 0; z < 4; z++) b.set(x, y, z, cols[band]);
+  }
+  return b.done();
+}
+
+// Lv.30 小火车 12x8x6
+function train() {
+  const b = builder(12, 8, 6);
+  b.box(0, 1, 0, 4, 4, 5, C.strawberry);
+  b.box(1, 5, 2, 2, 6, 3, C.cocoa);
+  b.box(5, 1, 2, 5, 2, 3, C.cocoa);
+  b.box(6, 1, 0, 8, 4, 5, C.butter);
+  b.box(6, 5, 1, 8, 5, 4, C.lilac);
+  b.box(9, 1, 1, 11, 3, 4, C.mint);
+  for (const x of [1, 3, 7, 10]) { b.set(x, 0, 0, C.ink).set(x, 0, 5, C.ink); }
+  b.paintFront(7, 2, C.sky).paintFront(2, 2, C.sky).paintFront(10, 2, C.sky);
+  return b.done();
+}
+
+// 30 关：每档 6 关，难度 1→5 平缓递增（同档内按体积递增）
 export const OFFICIAL_LEVELS = [
+  { id: 'lv12', name: '小星星', diff: 1, build: star },
   { id: 'lv1', name: '瞌睡小黄鸭', diff: 1, build: duck },
+  { id: 'lv14', name: '小房子', diff: 1, build: house },
+  { id: 'lv11', name: '小雪人', diff: 1, build: snowman },
   { id: 'lv2', name: '弹力红伞菇', diff: 1, build: mushroom },
+  { id: 'lv13', name: '小蝌蚪', diff: 1, build: tadpole },
+  { id: 'lv16', name: '马卡龙', diff: 2, build: macaron },
   { id: 'lv3', name: '破壳小萌鸡', diff: 2, build: chick },
+  { id: 'lv15', name: '小南瓜', diff: 2, build: pumpkin },
+  { id: 'lv17', name: '热气球', diff: 2, build: balloon },
+  { id: 'lv18', name: '樱花树', diff: 2, build: cherry },
   { id: 'lv4', name: '垂耳奶油兔', diff: 2, build: bunny },
+  { id: 'lv22', name: '小蜗牛', diff: 3, build: snail },
+  { id: 'lv19', name: '小飞机', diff: 3, build: airplane },
+  { id: 'lv21', name: '灯塔', diff: 3, build: lighthouse },
+  { id: 'lv20', name: '童话城堡', diff: 3, build: castle },
   { id: 'lv5', name: '竹蜻蜓橘猫', diff: 3, build: cat },
   { id: 'lv6', name: '云端小鲸鱼', diff: 3, build: whale },
+  { id: 'lv23', name: '小熊', diff: 4, build: bear },
+  { id: 'lv24', name: '小火箭', diff: 4, build: rocket },
+  { id: 'lv25', name: '棉花云', diff: 4, build: cloud },
+  { id: 'lv26', name: '小雏菊', diff: 4, build: flower },
   { id: 'lv7', name: '发条呆企鹅', diff: 4, build: penguin },
   { id: 'lv8', name: '微风磨坊屋', diff: 4, build: windmill },
+  { id: 'lv29', name: '彩虹桥', diff: 5, build: rainbow },
+  { id: 'lv27', name: '摩天轮', diff: 5, build: ferris },
+  { id: 'lv30', name: '小火车', diff: 5, build: train },
+  { id: 'lv28', name: '飞碟', diff: 5, build: ufo },
   { id: 'lv9', name: '星际宇航柴', diff: 5, build: shiba },
   { id: 'lv10', name: '天空音乐飞艇', diff: 5, build: airship },
 ];

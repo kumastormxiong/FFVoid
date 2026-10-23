@@ -4,6 +4,8 @@
 import { buildOfficialLevels } from './levels.js';
 
 const KEY = 'wakeupcubes.save.v1';
+// 内置关卡库版本：官方关卡变化时改这个 id，老存档会自动合并新关卡（进度与玩家自建关卡保留）
+const BUILTIN_PACK = 'builtin-2026.10.23';
 
 export const DEFAULT_CONFIG = {
   lives: 3,
@@ -57,7 +59,7 @@ export const store = {
         progress: saved.progress || {},
         lastPlayed: saved.lastPlayed || null,
       };
-      const pid = this.pack ? String(this.pack.packId || 'pack') : 'builtin';
+      const pid = this.pack ? String(this.pack.packId || 'pack') : BUILTIN_PACK;
       if (pid !== this.data.packId) this.mergeOfficial();
     }
     this.save();
@@ -71,7 +73,7 @@ export const store = {
   fresh() {
     const cfg = { ...DEFAULT_CONFIG, ...(this.pack && this.pack.config ? this.pack.config : {}) };
     return {
-      packId: this.pack ? String(this.pack.packId || 'pack') : 'builtin',
+      packId: this.pack ? String(this.pack.packId || 'pack') : BUILTIN_PACK,
       config: cfg,
       levels: this.officialSource(),
       progress: {},
@@ -84,7 +86,7 @@ export const store = {
     const custom = this.data.levels.filter(l => !l.official);
     const off = this.officialSource();
     this.data.levels = [...off, ...custom].map(sanitizeLevel);
-    this.data.packId = this.pack ? String(this.pack.packId || 'pack') : 'builtin';
+    this.data.packId = this.pack ? String(this.pack.packId || 'pack') : BUILTIN_PACK;
     if (this.pack && this.pack.config) this.data.config = { ...this.data.config, ...this.pack.config };
   },
 
