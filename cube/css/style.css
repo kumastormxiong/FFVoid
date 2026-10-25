@@ -346,6 +346,9 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 
   .icon-btn { width: 42px; height: 42px; border-radius: 14px; }
   .big-btn { min-width: 150px; font-size: 20px; padding: 14px 20px; }
   .pill-btn { padding: 8px 12px; font-size: 14px; }
+  html[lang="en"] .topbar { gap: 4px; }
+  html[lang="en"] .topbar .chip { padding: 6px 10px; font-size: 13px; }
+  html[lang="en"] .topbar .pill-btn { padding: 8px 10px; font-size: 13px; }
   .play-title { padding: 4px 10px; }
   .lv-name { font-size: 15px; }
   .lv-meta { font-size: 12px; }

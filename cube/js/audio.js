@@ -1,3 +1,4 @@
+import { tr } from './i18n.js';
 // 声音系统：Web Audio 合成音效 + 背景音乐（Suno 曲目 / 程序化八音盒兜底）
 
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
@@ -263,7 +264,7 @@ class AudioSystem {
     return [
       {
         // 1. 八音盒摇篮曲（原曲）
-        title: '八音盒摇篮曲', bpm: 84, len: 8,
+        title: tr('八音盒摇篮曲'), bpm: 84, len: 8,
         chords: [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 67], [60, 64, 67, 72], [57, 60, 64, 69], [53, 57, 60, 65], [55, 59, 62, 65]],
         step(pos, ch, t, bus, eighth) {
           if (pos === 0) ch.slice(0, 3).forEach(n => S.tone({ f: midi(n - 12), t, dur: eighth * 8.5, vol: 0.05, type: 'triangle', attack: 0.4, dest: bus, verb: 0.4 }));
@@ -276,7 +277,7 @@ class AudioSystem {
       },
       {
         // 2. 星星糖华尔兹：3/4 拍，低音 + “嘭嚓嚓” 八音盒和弦
-        title: '星星糖华尔兹', bpm: 92, len: 6,
+        title: tr('星星糖华尔兹'), bpm: 92, len: 6,
         chords: [[53, 57, 60, 64], [50, 53, 57, 60], [46, 50, 53, 57], [48, 52, 55, 58], [53, 57, 60, 64], [45, 48, 52, 55], [46, 50, 53, 57], [48, 52, 55, 60]],
         state: { prev: 72 },
         step(pos, ch, t, bus, eighth) {
@@ -301,7 +302,7 @@ class AudioSystem {
       },
       {
         // 3. 泡泡散步：轻快的木琴琶音 + 沙锤 + 八音盒点缀
-        title: '泡泡散步', bpm: 100, len: 8,
+        title: tr('泡泡散步'), bpm: 100, len: 8,
         chords: [[55, 59, 62, 66], [52, 55, 59, 62], [48, 52, 55, 59], [50, 54, 57, 60], [55, 59, 62, 67], [52, 55, 59, 64], [45, 48, 52, 55], [50, 54, 57, 62]],
         step(pos, ch, t, bus, eighth) {
           if (pos === 0 || pos === 4) S.tone({ f: midi(ch[0] - 12 + (pos === 4 ? 7 : 0)), t, dur: eighth * 1.6, vol: 0.08, type: 'sine', attack: 0.005, dest: bus, verb: 0.1 });

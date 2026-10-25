@@ -1,3 +1,4 @@
+import { tr } from './i18n.js';
 // 关卡 <-> 关卡码
 // 新格式：上下文建模 + 自适应二进制算术编码，输出为纯数字串。
 // 纯数字可以用二维码的“数字模式”编码（每位仅 3.3 bit），所以二维码非常简单。
@@ -195,7 +196,7 @@ function digitsToBits(s) {
     const rest = s.length - i;
     const take = rest >= 17 ? 17 : rest;
     const nb = take === 17 ? 7 : TAIL_DIGITS.indexOf(take);
-    if (nb < 0) throw new Error('关卡码长度不对');
+    if (nb < 0) throw new Error(tr('关卡码长度不对'));
     let n = BigInt(s.slice(i, i + take));
     const chunk = [];
     for (let k = 0; k < nb; k++) { chunk.unshift(Number(n & 255n)); n >>= 8n; }
@@ -230,7 +231,7 @@ async function decodeLegacy(code) {
   const kind = code[0];
   let bytes = unb64url(code.slice(1));
   if (kind === 'z') bytes = await pipe(bytes, new DecompressionStream('deflate'));
-  else if (kind !== 'j') throw new Error('无法识别的关卡码');
+  else if (kind !== 'j') throw new Error(tr('无法识别的关卡码'));
   const obj = JSON.parse(new TextDecoder().decode(bytes));
   const [w, h, d] = obj.s.map(n => n | 0);
   const pal = obj.p.map(c => '#' + c.toUpperCase());
@@ -241,7 +242,7 @@ async function decodeLegacy(code) {
     const cp = obj.q[k + 1] | 0;
     voxels.push([idx % w, Math.floor(idx / w) % h, Math.floor(idx / (w * h)), pal[Math.floor(cp / 6)], cp % 6]);
   }
-  return { name: String(obj.n || '分享关卡').slice(0, 24), author: String(obj.a || '').slice(0, 16), data: { w, h, d, voxels } };
+  return { name: String(obj.n || tr('朋友的关卡')).slice(0, 24), author: String(obj.a || '').slice(0, 16), data: { w, h, d, voxels } };
 }
 
 export function extractCode(input) {
@@ -253,16 +254,16 @@ export function extractCode(input) {
 
 export async function decodeLevel(input) {
   const code = extractCode(input);
-  if (code.length < 6) throw new Error('关卡码太短了');
+  if (code.length < 6) throw new Error(tr('关卡码太短了'));
   let lv;
   if (/^\d+$/.test(code)) {
     const m = new Model(new Decoder(digitsToBits(code)), true);
     lv = codeLevel(m, null);
   } else lv = await decodeLegacy(code);
   const { w, h, d } = lv.data;
-  if (![w, h, d].every(n => n >= 2 && n <= 16)) throw new Error('关卡尺寸不正确');
-  if (!lv.data.voxels.length) throw new Error('这个关卡是空的');
-  return { ...lv, name: lv.name || '分享关卡', code };
+  if (![w, h, d].every(n => n >= 2 && n <= 16)) throw new Error(tr('关卡尺寸不正确'));
+  if (!lv.data.voxels.length) throw new Error(tr('这个关卡是空的'));
+  return { ...lv, name: lv.name || tr('朋友的关卡'), code };
 }
 
 export function siteUrl() {

@@ -1,3 +1,4 @@
+import { tr, lvName } from './i18n.js';
 // UGC 造物工坊：在 3D 网格中搭建体素、上色、指定动作部件、预览唤醒、试玩、发布分享
 import * as THREE from 'three';
 import { gridRaycast, rayToGrid, makeVoxelMaterial, getBlockGeometry, VoxelModel, BLOCK } from './voxel.js';
@@ -36,7 +37,7 @@ export class CreatorMode {
 
   // ---------- 文档 ----------
   newDoc(w = 7, h = 7, d = 7) {
-    this.doc = { id: null, name: '我的小伙伴', author: this.app.store ? this.app.store.config.playerName || '' : '', diff: 2, w, h, d, map: new Map() };
+    this.doc = { id: null, name: tr('我的小伙伴'), author: this.app.store ? this.app.store.config.playerName || '' : '', diff: 2, w, h, d, map: new Map() };
     this.undoStack = []; this.redoStack = [];
     this.rebuildFrame();
     this.refresh();
@@ -48,7 +49,7 @@ export class CreatorMode {
     L.voxels.forEach(v => map.set(K(v[0], v[1], v[2]), [v[3], v[4]]));
     this.doc = {
       id: asCopy ? null : entry.id,
-      name: asCopy ? entry.name + ' 改' : entry.name,
+      name: asCopy ? lvName(entry) + tr(' 改') : lvName(entry),
       author: asCopy ? (this.app.store.config.playerName || '') : entry.author || '',
       diff: entry.diff || 2,
       w: L.w, h: L.h, d: L.d, map,
@@ -63,7 +64,7 @@ export class CreatorMode {
     const d = this.doc;
     const voxels = [];
     for (const [k, v] of d.map) { const [x, y, z] = k.split(',').map(Number); voxels.push([x, y, z, v[0], v[1]]); }
-    return { id: d.id, name: d.name || '无名关卡', author: d.author || '', diff: d.diff, official: !!d.official, data: { w: d.w, h: d.h, d: d.d, voxels } };
+    return { id: d.id, name: d.name || tr('无名关卡'), author: d.author || '', diff: d.diff, official: !!d.official, data: { w: d.w, h: d.h, d: d.d, voxels } };
   }
 
   snapshot() { return JSON.stringify([this.doc.w, this.doc.h, this.doc.d, [...this.doc.map]]); }

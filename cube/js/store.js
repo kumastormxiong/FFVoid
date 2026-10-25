@@ -1,3 +1,4 @@
+import { tr } from './i18n.js';
 // 本地存储：全局配置 / 关卡库 / 通关进度
 // 纯前端：数据保存在玩家浏览器的 localStorage。
 // 站长可在后台导出 JSON 并保存为 data/game-pack.json，所有玩家打开网站时都会用这份关卡库。
@@ -24,7 +25,7 @@ function sanitizeLevel(L, i) {
   const d = L.data || {};
   return {
     id: String(L.id || uid()),
-    name: String(L.name || '无名关卡').slice(0, 24),
+    name: String(L.name || tr('无名关卡')).slice(0, 24),
     diff: Math.min(5, Math.max(1, L.diff | 0 || 1)),
     official: !!L.official,
     author: String(L.author || '').slice(0, 16),
@@ -91,7 +92,7 @@ export const store = {
   },
 
   save() {
-    try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { console.warn('存档失败', e); }
+    try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { console.warn(tr('存档失败'), e); }
     this.listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } });
   },
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
@@ -154,9 +155,9 @@ export const store = {
     };
   },
   importPack(obj, mode = 'replace') {
-    if (!obj || !Array.isArray(obj.levels)) throw new Error('不是有效的关卡包 JSON');
+    if (!obj || !Array.isArray(obj.levels)) throw new Error(tr('不是有效的关卡包 JSON'));
     const lv = obj.levels.map(sanitizeLevel).filter(l => l.data.voxels.length && l.data.w && l.data.h && l.data.d);
-    if (!lv.length) throw new Error('关卡包里没有可用的关卡');
+    if (!lv.length) throw new Error(tr('关卡包里没有可用的关卡'));
     if (mode === 'replace') this.data.levels = lv;
     else {
       const ids = new Set(this.data.levels.map(l => l.id));

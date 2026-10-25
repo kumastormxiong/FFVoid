@@ -39,6 +39,7 @@
       <div class="chip progress-chip"><span data-ic="star"></span><b id="homeProgress">0/10</b> 已唤醒</div>
       <div class="row">
         <button class="icon-btn" id="btnMusic" title="背景音乐" aria-label="背景音乐"></button>
+        <button class="pill-btn soft" id="btnLang" aria-label="Language">中文</button>
         <button class="pill-btn soft" id="btnAdmin" data-ic="gear"><span class="dev-hide">设置</span><span class="dev-only">后台管理</span></button>
       </div>
     </header>
@@ -213,7 +214,7 @@
         </section>
         <section class="glass card">
           <h2 data-ic="music">背景音乐</h2>
-          <p class="note dev-only">把 Suno 生成的 mp3 放进网站的 <code>music/</code> 文件夹，命名为 <code>bgm1.mp3</code>、<code>bgm2.mp3</code>…（最多 8 首）就会自动轮播；也可以在 <code>music/playlist.json</code> 里写曲名并指定在哪个场景播放。没有放音乐时会播放内置的八音盒摇篮曲。</p>
+          <p class="note dev-only" data-en="Drop Suno-generated mp3 files into the site’s <code>music/</code> folder, named <code>bgm1.mp3</code>, <code>bgm2.mp3</code>… (up to 8 tracks) and they’ll loop automatically. You can also list track names and the scenes they play in inside <code>music/playlist.json</code>. Without any tracks, the built-in music box lullaby plays.">把 Suno 生成的 mp3 放进网站的 <code>music/</code> 文件夹，命名为 <code>bgm1.mp3</code>、<code>bgm2.mp3</code>…（最多 8 首）就会自动轮播；也可以在 <code>music/playlist.json</code> 里写曲名并指定在哪个场景播放。没有放音乐时会播放内置的八音盒摇篮曲。</p>
           <div class="now" id="adminNow"></div>
           <div class="row"><button class="pill-btn" id="adminNextTrack" data-ic="music">切换下一首</button></div>
           <h2 data-ic="star" class="mt">我的进度</h2>
@@ -232,7 +233,7 @@
               <label class="pill-btn" data-ic="upload">导入 JSON<input type="file" id="adminImport" accept=".json,application/json" hidden></label>
             </div>
           </div>
-          <p class="note">这里的修改保存在当前浏览器。想让所有玩家都看到：点「导出 JSON」，把文件改名为 <code>game-pack.json</code> 放进网站的 <code>data/</code> 文件夹再上传即可。</p>
+          <p class="note" data-en="Changes here are saved in this browser only. To share them with everyone, click “Export JSON”, rename the file to <code>game-pack.json</code>, and upload it to the site’s <code>data/</code> folder.">这里的修改保存在当前浏览器。想让所有玩家都看到：点“导出 JSON”，把文件改名为 <code>game-pack.json</code> 放进网站的 <code>data/</code> 文件夹再上传即可。</p>
           <div class="level-table" id="adminTable"></div>
         </section>
       </div>

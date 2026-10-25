@@ -1,3 +1,4 @@
+import { tr, lvName, gameName, setLang, applyDom, i18n } from './i18n.js';
 // 醒醒吧！方块 —— 应用主控：界面、流程、分享、后台、VR 面板
 import { World } from './world.js';
 import { buildAtlas } from './voxel.js';
@@ -70,13 +71,13 @@ $('#modal .modal-x').onclick = () => modalClose && modalClose();
 $('#modal').addEventListener('pointerdown', (e) => { if (e.target.id === 'modal' && modalClose) modalClose(); });
 
 async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); toast('已复制到剪贴板 ✓'); return true; } catch (e) {
+  try { await navigator.clipboard.writeText(text); toast(tr('已复制到剪贴板 ✓')); return true; } catch (e) {
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta); ta.select();
     let ok = false;
     try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
     ta.remove();
-    toast(ok ? '已复制到剪贴板 ✓' : '复制失败，请手动长按复制');
+    toast(ok ? tr('已复制到剪贴板 ✓') : tr('复制失败，请手动长按复制'));
     return ok;
   }
 }
@@ -94,7 +95,7 @@ function officialIndex(entry) {
 }
 function displayName(entry) {
   const i = officialIndex(entry);
-  return (i ? `Lv.${i} ` : '') + entry.name;
+  return (i ? `Lv.${i} ` : '') + lvName(entry);
 }
 
 // ---------- 主题 ----------
@@ -180,17 +181,17 @@ function renderLevels() {
     card.innerHTML = `
       ${levelTab === 'official' ? `<span class="num">${i + 1}</span>` : ''}
       <div class="thumb">${thumb}</div>
-      <div class="name">${p ? esc(L.name) : (levelTab === 'official' ? '？？？' : esc(L.name))}</div>
-      <div class="meta"><span class="diff">难度 ${'★'.repeat(L.diff)}</span><span>${dims}</span></div>
+      <div class="name">${p ? esc(lvName(L)) : (levelTab === 'official' ? tr('？？？') : esc(lvName(L)))}</div>
+      <div class="meta"><span class="diff">${tr('难度')} ${'★'.repeat(L.diff)}</span><span>${dims}</span></div>
       <div class="stars">${starsHTML(p ? p.stars : 0)}</div>
       ${L.author && !L.official ? `<div class="by">by ${esc(L.author)}</div>` : ''}
-      ${!L.official ? `<button class="del" title="删除">${ICON.trash}</button>` : ''}`;
+      ${!L.official ? `<button class="del" title="${tr('删除')}">${ICON.trash}</button>` : ''}`;
     card.onclick = (e) => {
       if (e.target.closest('.del')) {
         e.stopPropagation();
         modal({
-          title: '删除关卡？', html: `<p>确定要删除「${esc(L.name)}」吗？</p>`,
-          actions: [{ label: '取消' }, { label: '删除', cls: 'pink', ic: 'trash', onClick: () => { store.deleteLevel(L.id); renderLevels(); toast('已删除'); } }],
+          title: tr('删除关卡？'), html: tr('<p>确定要删除“{name}”吗？</p>', { name: esc(lvName(L)) }),
+          actions: [{ label: tr('取消') }, { label: tr('删除'), cls: 'pink', ic: 'trash', onClick: () => { store.deleteLevel(L.id); renderLevels(); toast(tr('已删除')); } }],
         });
         return;
       }
@@ -226,7 +227,7 @@ function startLevel(entry, ctx = {}) {
   });
   const hint = $('#playHint');
   hint.classList.remove('fade');
-  hint.textContent = matchMedia('(pointer: coarse)').matches ? '点一下敲掉多余方块 · 长按 = 保护' : '左键敲掉多余方块 · 右键保护 · 拖动旋转';
+  hint.textContent = matchMedia('(pointer: coarse)').matches ? tr('点一下敲掉多余方块 · 长按 = 保护') : tr('左键敲掉多余方块 · 右键保护 · 拖动旋转');
   clearTimeout(app.hintTimer);
   app.hintTimer = setTimeout(() => hint.classList.add('fade'), 5000);
   setTool('break');
@@ -243,7 +244,7 @@ app.onPlayState = (info, extra) => {
   if (app.screen !== 'play') return;
   // 生命值
   const hearts = $('#playHearts');
-  if (info.casual) hearts.innerHTML = `${ICON.heart}<span class="inf">休闲</span>`;
+  if (info.casual) hearts.innerHTML = `${ICON.heart}<span class="inf">${tr('休闲')}</span>`;
   else {
     let h = '';
     for (let i = 0; i < info.maxLives; i++) h += `<span class="${i < info.lives ? '' : 'lost'}">${ICON.heart}</span>`;
@@ -252,7 +253,7 @@ app.onPlayState = (info, extra) => {
   }
   if (extra.mistake) {
     hearts.classList.remove('shake'); void hearts.offsetWidth; hearts.classList.add('shake');
-    if (!info.casual && info.lives > 0) toast(`哎呀，那是要保留的方块！已自动保护 (剩 ${info.lives} 颗心)`);
+    if (!info.casual && info.lives > 0) toast(tr('哎呀，那是要保留的方块！已自动保护 (剩 {n} 颗心)', { n: info.lives }));
   }
   $('#playRemain').textContent = info.remaining;
   $('#playTime').textContent = fmtTime(info.time);
@@ -297,25 +298,25 @@ app.onPlayEnd = (result) => {
   };
   if (result.ok) {
     if (entry.id && store.getLevel(entry.id) && !ctx.test) store.setProgress(entry.id, { stars: result.stars, time: result.time, mistakes: result.mistakes });
-    $('#resultTitle').textContent = `「${entry.name}」醒啦！`;
+    $('#resultTitle').textContent = tr('“{name}”醒啦！', { name: lvName(entry) });
     $('#resultStars').innerHTML = starsHTML(result.stars);
-    $('#resultStats').innerHTML = `<span>用时<b>${fmtTime(result.time)}</b></span><span>失误<b>${result.mistakes}</b></span>`;
+    $('#resultStats').innerHTML = `<span>${tr('用时')}<b>${fmtTime(result.time)}</b></span><span>${tr('失误')}<b>${result.mistakes}</b></span>`;
     if (ctx.test) {
-      btn('返回工坊', 'pink', 'sparkle', () => goCreator(null, { keep: true }));
-      btn('再试一次', '', 'restart', () => startLevel(entry, ctx));
+      btn(tr('返回工坊'), 'pink', 'sparkle', () => goCreator(null, { keep: true }));
+      btn(tr('再试一次'), '', 'restart', () => startLevel(entry, ctx));
     } else {
-      btn('分享', 'pink', 'share', () => shareResult(entry, result));
+      btn(tr('分享'), 'pink', 'share', () => shareResult(entry, result));
       const nx = nextEntry(entry);
-      if (nx) btn('下一关', 'mint', 'play', () => startLevel(nx, { from: ctx.from }));
-      btn('再玩一次', '', 'restart', () => startLevel(entry, ctx));
-      btn('收藏室', '', 'gift', () => goCollection(entry.id));
+      if (nx) btn(tr('下一关'), 'mint', 'play', () => startLevel(nx, { from: ctx.from }));
+      btn(tr('再玩一次'), '', 'restart', () => startLevel(entry, ctx));
+      btn(tr('收藏室'), '', 'gift', () => goCollection(entry.id));
     }
   } else {
-    $('#resultTitle').textContent = '方块又睡着啦…';
+    $('#resultTitle').textContent = tr('方块又睡着啦…');
     $('#resultStars').innerHTML = '';
-    $('#resultStats').innerHTML = `<span>没关系，再来一次一定行！</span>`;
-    btn('再试一次', 'pink', 'restart', () => startLevel(entry, ctx));
-    btn('返回', '', 'back', () => leavePlay());
+    $('#resultStats').innerHTML = tr(`<span>没关系，再来一次一定行！</span>`);
+    btn(tr('再试一次'), 'pink', 'restart', () => startLevel(entry, ctx));
+    btn(tr('返回'), '', 'back', () => leavePlay());
   }
   setTimeout(() => card.classList.remove('hidden'), result.ok ? 700 : 300);
   updateVRPanel();
@@ -335,12 +336,12 @@ function shareResult(entry, result) {
   // 设置里已经填过名字，就不再询问
   if (cur) { buildShare(entry, result, cur); return; }
   modal({
-    title: result && result.ok ? '分享你的战绩 ✨' : '分享这个关卡',
-    html: `<p>写上你的名字，朋友就知道是谁发来的挑战啦（可不填）：</p>
-      <input class="txt" id="shareName" maxlength="12" placeholder="你的名字" value="${esc(cur)}">`,
+    title: result && result.ok ? tr('分享你的战绩 ✨') : tr('分享这个关卡'),
+    html: `${tr('<p>写上你的名字，朋友就知道是谁发来的挑战啦（可不填）：</p>')}
+      <input class="txt" id="shareName" maxlength="12" placeholder="${tr('你的名字')}" value="${esc(cur)}">`,
     actions: [
-      { label: '不写名字', onClick: () => { setTimeout(() => buildShare(entry, result, ''), 50); } },
-      { label: '生成分享图', cls: 'pink', ic: 'share', onClick: () => {
+      { label: tr('不写名字'), onClick: () => { setTimeout(() => buildShare(entry, result, ''), 50); } },
+      { label: tr('生成分享图'), cls: 'pink', ic: 'share', onClick: () => {
         const n = ($('#shareName').value || '').trim().slice(0, 12);
         if (n !== cur) store.setConfig({ playerName: n });
         setTimeout(() => buildShare(entry, result, n), 50);
@@ -351,7 +352,7 @@ function shareResult(entry, result) {
 }
 
 async function buildShare(entry, result, player) {
-  toast('正在生成分享图…', 1200);
+  toast(tr('正在生成分享图…'), 1200);
   const idx = officialIndex(entry);
   // 官方关卡：?lv= 短链接；玩家关卡：关卡码直接压进二维码（纯数字，极致压缩）
   let link = siteUrl() + '?lv=' + entry.id, code = '';
@@ -361,18 +362,17 @@ async function buildShare(entry, result, player) {
   const cv = await makeShareCard({ entry, result, qrUrl: link, index: idx, player });
   const url = cv.toDataURL('image/png');
   audio.play('share');
-  const who = player || '我';
   const head = result && result.ok
-    ? `${who}在《${CONFIG.GAME_NAME}》里用 ${fmtTime(result.time)} 叫醒了一个小伙伴，快来唤醒它吧！`
-    : `${player ? player + '邀请你' : ''}来《${CONFIG.GAME_NAME}》唤醒一个沉睡的方块吧！`;
+    ? tr('{who}在《{game}》里用 {time} 叫醒了一个小伙伴，快来唤醒它吧！', { who: player || tr('我'), game: gameName(), time: fmtTime(result.time) })
+    : player ? tr('{player}邀请你来《{game}》唤醒一个沉睡的方块吧！', { player, game: gameName() }) : tr('来《{game}》唤醒一个沉睡的方块吧！', { game: gameName() });
   const text = head;
   modal({
-    title: '分享给朋友',
-    html: `<img class="share-img" src="${url}" alt="分享图"><p style="font-size:13px;color:var(--ink-soft)">分享图只展示还没唤醒的谜题方块，不会剧透；扫二维码就能直接玩这一关。手机上可以长按图片保存。</p>`,
+    title: tr('分享给朋友'),
+    html: `<img class="share-img" src="${url}" alt="${tr('分享图')}">${tr('<p style="font-size:13px;color:var(--ink-soft)">分享图只展示还没唤醒的谜题方块，不会剧透；扫二维码就能直接玩这一关。手机上可以长按图片保存。</p>')}`,
     actions: [
-      { label: '复制链接', ic: 'link', onClick: () => { copyText(head + '\n' + link); return false; } },
-      { label: '保存图片', ic: 'download', onClick: async () => { downloadBlob(await canvasToBlob(cv), `wakeup-cubes-${Date.now()}.png`); return false; } },
-      { label: '分享', cls: 'pink', ic: 'share', onClick: async () => { const r = await shareCanvas(cv, { title: CONFIG.GAME_NAME, text, url: link, filename: 'wakeup-cubes.png' }); if (r === 'download') toast('已保存图片，发给朋友吧～'); return false; } },
+      { label: tr('复制链接'), ic: 'link', onClick: () => { copyText(head + '\n' + link); return false; } },
+      { label: tr('保存图片'), ic: 'download', onClick: async () => { downloadBlob(await canvasToBlob(cv), `wakeup-cubes-${Date.now()}.png`); return false; } },
+      { label: tr('分享'), cls: 'pink', ic: 'share', onClick: async () => { const r = await shareCanvas(cv, { title: gameName(), text, url: link, filename: 'wakeup-cubes.png' }); if (r === 'download') toast(tr('已保存图片，发给朋友吧～')); return false; } },
     ],
   });
 }
@@ -381,16 +381,16 @@ async function shareLevelModal(entry, { justSaved = false } = {}) {
   const code = await encodeLevel(entry);
   const link = shareLink(code);
   modal({
-    title: justSaved ? '关卡已发布 ✨' : '分享关卡',
-    html: `${justSaved ? '<p>已保存到「玩家关卡」。把下面的链接或关卡码发给朋友，打开就能直接玩！</p>' : ''}
-      <p><b style="font-family:var(--font-fun);font-weight:400">分享链接</b></p>
+    title: justSaved ? tr('关卡已发布 ✨') : tr('分享关卡'),
+    html: `${justSaved ? tr('<p>已保存到“玩家关卡”。把下面的链接或关卡码发给朋友，打开就能直接玩！</p>') : ''}
+      <p><b style="font-family:var(--font-fun);font-weight:400">${tr('分享链接')}</b></p>
       <div class="codebox">${esc(link)}</div>
-      <p style="margin-top:10px"><b style="font-family:var(--font-fun);font-weight:400">关卡码</b> <small style="color:var(--ink-soft)">（在首页「输入关卡码」粘贴即可）</small></p>
+      <p style="margin-top:10px"><b style="font-family:var(--font-fun);font-weight:400">${tr('关卡码')}</b> <small style="color:var(--ink-soft)">${tr('（在首页“输入关卡码”粘贴即可）')}</small></p>
       <div class="codebox">${esc(code)}</div>`,
     actions: [
-      { label: '复制关卡码', ic: 'copy', onClick: () => { copyText(code); return false; } },
-      { label: '复制链接', ic: 'link', onClick: () => { copyText(link); return false; } },
-      { label: '生成分享图', cls: 'pink', ic: 'share', onClick: () => { shareResult(entry, null); return false; } },
+      { label: tr('复制关卡码'), ic: 'copy', onClick: () => { copyText(code); return false; } },
+      { label: tr('复制链接'), ic: 'link', onClick: () => { copyText(link); return false; } },
+      { label: tr('生成分享图'), cls: 'pink', ic: 'share', onClick: () => { shareResult(entry, null); return false; } },
     ],
   });
 }
@@ -406,12 +406,12 @@ async function openSharedCode(input) {
     const lv = await decodeLevel(input);
     const existing = store.levels().find(l => sameData(l.data, lv.data));
     modal({
-      title: '收到一个分享关卡 🎁',
-      html: `<p style="text-align:center;font-family:var(--font-fun);font-size:22px;margin:8px 0">「${esc(lv.name)}」</p>
-        <p style="text-align:center;color:var(--ink-soft)">${lv.data.w}×${lv.data.h}×${lv.data.d} 体素谜题${lv.author ? ' · 作者 ' + esc(lv.author) : ''}</p>`,
+      title: tr('收到一个分享关卡 🎁'),
+      html: `<p style="text-align:center;font-family:var(--font-fun);font-size:22px;margin:8px 0">“${esc(lv.name)}”</p>
+        <p style="text-align:center;color:var(--ink-soft)">${lv.data.w}×${lv.data.h}×${lv.data.d} ${tr('体素谜题')}${lv.author ? tr(' · 作者 ') + esc(lv.author) : ''}</p>`,
       actions: [
-        { label: '稍后再玩', onClick: () => { if (!existing) { store.upsertLevel({ name: lv.name, author: lv.author, diff: 3, official: false, data: lv.data }); toast('已保存到「玩家关卡」'); } } },
-        { label: '开始挑战', cls: 'pink', ic: 'play', onClick: () => {
+        { label: tr('稍后再玩'), onClick: () => { if (!existing) { store.upsertLevel({ name: lv.name, author: lv.author, diff: 3, official: false, data: lv.data }); toast(tr('已保存到“玩家关卡”')); } } },
+        { label: tr('开始挑战'), cls: 'pink', ic: 'play', onClick: () => {
           audio.unlock();
           const saved = existing || store.upsertLevel({ name: lv.name, author: lv.author, diff: 3, official: false, data: lv.data });
           startLevel(saved, { from: 'share' });
@@ -419,31 +419,31 @@ async function openSharedCode(input) {
       ],
     });
   } catch (e) {
-    toast('关卡码好像不对：' + e.message, 3200);
+    toast(tr('关卡码好像不对：') + e.message, 3200);
   }
 }
 
 function askCode() {
   modal({
-    title: '输入关卡码',
-    html: `<p>把朋友发来的关卡码或分享链接粘贴到这里：</p><textarea id="codeInput" placeholder="z..."></textarea>`,
-    actions: [{ label: '取消' }, { label: '打开', cls: 'pink', ic: 'play', onClick: () => { const v = $('#codeInput').value; if (!v.trim()) return false; setTimeout(() => openSharedCode(v), 50); } }],
+    title: tr('输入关卡码'),
+    html: tr(`<p>把朋友发来的关卡码或分享链接粘贴到这里：</p><textarea id="codeInput" placeholder="z..."></textarea>`),
+    actions: [{ label: tr('取消') }, { label: tr('打开'), cls: 'pink', ic: 'play', onClick: () => { const v = $('#codeInput').value; if (!v.trim()) return false; setTimeout(() => openSharedCode(v), 50); } }],
     onOpen: () => setTimeout(() => $('#codeInput') && $('#codeInput').focus(), 100),
   });
 }
 
 function showHowto() {
   modal({
-    title: '怎么玩？', wide: true,
+    title: tr('怎么玩？'), wide: true,
     html: `<div class="howto">
-      <div class="step"><div class="demo">3</div><div><b>数字 = 这一排要留下几个</b><br>方块某一面上的数字，表示垂直穿过这一面的那一整排里，有几块是小伙伴的身体（要保留）。</div></div>
-      <div class="step"><div class="demo">4<span class="dots"><i></i><i></i></span></div><div><b>两个圆点 = 分成 2 段</b><br>这 4 块不是连在一起的，中间被隔开成了 2 段；<b>三个紫色圆点</b> = 3 段或更多。</div></div>
-      <div class="step"><div class="demo zero">0</div><div><b>0 = 这一排全部敲掉</b><br>从 0 开始是最轻松的入门方法！</div></div>
-      <div class="step"><div class="demo ok">${ICON.shield}</div><div><b>敲除 & 保护</b><br>电脑：左键敲掉、右键保护；手机：点击敲掉、长按保护。确定要留的方块先保护起来，就不会误敲啦。敲错会扣一颗心哦。</div></div>
-      <div class="step"><div class="demo">${ICON.layers}</div><div><b>切片看里面</b><br>拖动转视角，用 X / Y / Z 滑块一层层剥开外壳，敲掉藏在里面的多余方块。全部敲完小伙伴就会醒来！</div></div>
-      <div class="step"><div class="demo">${ICON.vr}</div><div><b>Quest VR</b><br>扳机：敲除（或当前工具）· 侧握键：保护 · A/X 键：切换工具 · 摇杆：旋转方块 · 左侧悬浮面板：切片、选关、回主页、创造关卡、退出。</div></div>
+      <div class="step"><div class="demo">3</div><div>${tr('<b>数字 = 这一排要留下几个</b><br>方块某一面上的数字，表示垂直穿过这一面的那一整排里，有几块是小伙伴的身体（要保留）。')}</div></div>
+      <div class="step"><div class="demo">4<span class="dots"><i></i><i></i></span></div><div>${tr('<b>两个圆点 = 分成 2 段</b><br>这 4 块不是连在一起的，中间被隔开成了 2 段；<b>三个紫色圆点</b> = 3 段或更多。')}</div></div>
+      <div class="step"><div class="demo zero">0</div><div>${tr('<b>0 = 这一排全部敲掉</b><br>从 0 开始是最轻松的入门方法！')}</div></div>
+      <div class="step"><div class="demo ok">${ICON.shield}</div><div>${tr('<b>敲除 & 保护</b><br>电脑：左键敲掉、右键保护；手机：点击敲掉、长按保护。确定要留的方块先保护起来，就不会误敲啦。敲错会扣一颗心哦。')}</div></div>
+      <div class="step"><div class="demo">${ICON.layers}</div><div>${tr('<b>切片看里面</b><br>拖动转视角，用 X / Y / Z 滑块一层层剥开外壳，敲掉藏在里面的多余方块。全部敲完小伙伴就会醒来！')}</div></div>
+      <div class="step"><div class="demo">${ICON.vr}</div><div>${tr('<b>Quest VR</b><br>扳机：敲除（或当前工具）· 侧握键：保护 · A/X 键：切换工具 · 摇杆：旋转方块 · 左侧悬浮面板：切片、选关、回主页、创造关卡、退出。')}</div></div>
     </div>`,
-    actions: [{ label: '明白啦！', cls: 'pink' }],
+    actions: [{ label: tr('明白啦！'), cls: 'pink' }],
   });
 }
 
@@ -454,10 +454,10 @@ function goCollection(focusId) {
   app.collection.load(entries);
   app.world.setMode(app.collection);
   showScreen('collection');
-  $('#collCount').textContent = `${entries.length} 位小伙伴`;
+  $('#collCount').textContent = `${entries.length} ${tr('位小伙伴')}`;
   $('#collEmpty').classList.toggle('hidden', entries.length > 0);
   $('.coll-bottom').classList.toggle('hidden', entries.length === 0);
-  $('#collInfo').innerHTML = '点击小伙伴和它互动～';
+  $('#collInfo').innerHTML = tr('点击小伙伴和它互动～');
   if (focusId) {
     const i = entries.findIndex(e => e.id === focusId);
     if (i >= 0) setTimeout(() => app.collection.poke(i), 500);
@@ -465,7 +465,7 @@ function goCollection(focusId) {
 }
 app.onCollectionSelect = (entry) => {
   const p = store.progress(entry.id);
-  $('#collInfo').innerHTML = `<b>${esc(displayName(entry))}</b><br><span style="font-size:13px;color:var(--ink-soft)">${p ? '最佳 ' + fmtTime(p.time) + ' · ' + '★'.repeat(p.stars) : ''}</span>`;
+  $('#collInfo').innerHTML = `<b>${esc(displayName(entry))}</b><br><span style="font-size:13px;color:var(--ink-soft)">${p ? tr('最佳 ') + fmtTime(p.time) + ' · ' + '★'.repeat(p.stars) : ''}</span>`;
 };
 
 // ---------- 造物工坊 ----------
@@ -514,17 +514,17 @@ function buildCreatorUI() {
     s.onchange = () => { cr.resize(+$('#crW').value, +$('#crH').value, +$('#crD').value); syncCreatorUI(); };
   });
   $$('[data-crtool]').forEach(b => b.onclick = () => { setCrTool(b.dataset.crtool); audio.play('click'); });
-  $('#crMirror').onclick = () => { cr.mirror = !cr.mirror; audio.play('click'); syncCreatorUI(); toast(cr.mirror ? '镜像开启：左右对称搭建' : '镜像关闭'); };
+  $('#crMirror').onclick = () => { cr.mirror = !cr.mirror; audio.play('click'); syncCreatorUI(); toast(cr.mirror ? tr('镜像开启：左右对称搭建') : tr('镜像关闭')); };
   $('#crShowParts').onclick = () => { cr.setShowParts(!cr.showParts); audio.play('click'); syncCreatorUI(); };
   $('#crUndo').onclick = () => cr.undo();
   $('#crRedo').onclick = () => cr.redo();
   $('#crFloor').onclick = () => { cr.fillFloor(); audio.play('place'); };
-  $('#crClear').onclick = () => modal({ title: '清空画布？', html: '<p>所有方块都会被清掉（可以撤销）。</p>', actions: [{ label: '取消' }, { label: '清空', cls: 'pink', ic: 'trash', onClick: () => cr.clear() }] });
+  $('#crClear').onclick = () => modal({ title: tr('清空画布？'), html: tr('<p>所有方块都会被清掉（可以撤销）。</p>'), actions: [{ label: tr('取消') }, { label: tr('清空'), cls: 'pink', ic: 'trash', onClick: () => cr.clear() }] });
   $('#crName').oninput = (e) => { cr.doc.name = e.target.value; saveDraft(); };
   $('#crPreview').onclick = () => {
     audio.unlock();
     if (cr.preview) cr.stopPreview();
-    else if (!cr.startPreview()) toast('先放几个方块吧～');
+    else if (!cr.startPreview()) toast(tr('先放几个方块吧～'));
     syncCreatorUI();
   };
   $('#crBack').onclick = () => { audio.play('click'); cr.stopPreview(); goHome(); };
@@ -560,8 +560,8 @@ function syncCreatorUI() {
   $$('#crPalette .swatch').forEach(b => b.classList.toggle('active', b.dataset.c.toLowerCase() === String(cr.color).toLowerCase()));
   $$('#crParts .part').forEach(b => b.classList.toggle('active', +b.dataset.p === cr.part));
   const st = cr.stats();
-  $('#crStats').textContent = `${st.count} 个方块 / ${st.total} 格 · 需要敲掉 ${st.total - st.count} 块`;
-  $('#crPreview').lastChild.textContent = cr.preview ? '停止预览' : '预览唤醒动画';
+  $('#crStats').textContent = tr('{count} 个方块 / {total} 格 · 需要敲掉 {left} 块', { count: st.count, total: st.total, left: st.total - st.count });
+  $('#crPreview').lastChild.textContent = cr.preview ? tr('停止预览') : tr('预览唤醒动画');
   $('#crUndo').style.opacity = cr.undoStack.length ? 1 : 0.4;
   $('#crRedo').style.opacity = cr.redoStack.length ? 1 : 0.4;
 }
@@ -577,8 +577,8 @@ app.onCreatorChange = (cr, pickOnly) => { if (app.screen === 'creator') { syncCr
 
 function validateDoc() {
   const st = app.creator.stats();
-  if (st.count < 2) return '至少放 2 个方块才能做成关卡哦';
-  if (st.count >= st.total) return '方块把格子塞满啦，至少留一个需要敲掉的空位';
+  if (st.count < 2) return tr('至少放 2 个方块才能做成关卡哦');
+  if (st.count >= st.total) return tr('方块把格子塞满啦，至少留一个需要敲掉的空位');
   return '';
 }
 
@@ -598,12 +598,12 @@ async function publishDoc() {
 
 function templateModal() {
   const all = store.levels();
-  const html = `<p>选一个作为起点（会复制一份，不会改动原关卡），或者从空白开始：</p>
+  const html = `${tr('<p>选一个作为起点（会复制一份，不会改动原关卡），或者从空白开始：</p>')}
     <div class="tpl-grid">
-      <button class="tpl" data-tpl="blank"><div class="sleepy-cube" style="width:64px;height:64px;border-radius:18px"><i class="eye l"></i><i class="eye r"></i><i class="mouth"></i></div>空白画布</button>
+      <button class="tpl" data-tpl="blank"><div class="sleepy-cube" style="width:64px;height:64px;border-radius:18px"><i class="eye l"></i><i class="eye r"></i><i class="mouth"></i></div>${tr('空白画布')}</button>
       ${all.map(L => `<button class="tpl" data-tpl="${L.id}"><img alt="" src="${thumbnail(L, 144)}">${esc(L.name)}</button>`).join('')}
     </div>`;
-  const m = modal({ title: '从模板开始', wide: true, html, actions: [{ label: '取消' }] });
+  const m = modal({ title: tr('从模板开始'), wide: true, html, actions: [{ label: tr('取消') }] });
   $$('.tpl', m.body).forEach(b => b.onclick = () => {
     const id = b.dataset.tpl;
     if (id === 'blank') app.creator.newDoc(+$('#crW').value, +$('#crH').value, +$('#crD').value);
@@ -635,12 +635,12 @@ function renderAdmin() {
     `<button class="theme ${cfg.theme === k ? 'active' : ''}" data-theme="${k}" style="background:linear-gradient(180deg,${t.skyTop},${t.skyBottom});color:${k === 'night' ? '#fff' : 'var(--ink)'}">${t.name}</button>`).join('');
   $$('#cfgThemes .theme').forEach(b => b.onclick = () => { store.setConfig({ theme: b.dataset.theme }); applyTheme(b.dataset.theme); audio.play('click'); renderAdmin(); });
   const dev = document.body.classList.contains('dev');
-  $('#adminNow').textContent = '正在播放：' + (store.config.music ? (audio.currentTitle() || '（点击页面后开始播放）') : '音乐已关闭')
-    + (dev ? (audio.tracks.length ? `（共 ${audio.tracks.length} 首）` : '（未找到 music/ 曲目，使用内置八音盒）') : '');
+  $('#adminNow').textContent = tr('正在播放：') + (store.config.music ? (audio.currentTitle() || tr('（点击页面后开始播放）')) : tr('音乐已关闭'))
+    + (dev ? (audio.tracks.length ? `（共 ${audio.tracks.length} 首）` : tr('（未找到 music/ 曲目，使用内置八音盒）')) : '');
   const lv = store.levels();
   const done = store.completedIds().length;
   const stars = Object.values(store.data.progress).reduce((a, p) => a + (p.stars || 0), 0);
-  $('#adminStats').innerHTML = `<div><b>${lv.length}</b>关卡总数</div><div><b>${done}</b>已通关</div><div><b>${stars}</b>获得星星</div>`;
+  $('#adminStats').innerHTML = `<div><b>${lv.length}</b>${tr('关卡总数')}</div><div><b>${done}</b>${tr('已通关')}</div><div><b>${stars}</b>${tr('获得星星')}</div>`;
   $('#adminVersion').textContent = 'v' + CONFIG.VERSION;
   const tb = $('#adminTable');
   tb.innerHTML = '';
@@ -650,19 +650,19 @@ function renderAdmin() {
     let img = '';
     try { img = `<img alt="" src="${thumbnail(L, 96)}">`; } catch (e) { img = '<span class="mini"></span>'; }
     row.innerHTML = `<span class="idx">${i + 1}</span>${img}
-      <div class="nm"><input value="${esc(L.name)}" maxlength="16"><div class="info">${L.data.w}×${L.data.h}×${L.data.d} · ${L.data.voxels.length} 块<span class="badge ${L.official ? '' : 'c'}">${L.official ? '官方' : '玩家'}</span>${L.author ? ' · ' + esc(L.author) : ''}</div></div>
-      <select class="dsel" title="难度">${[1, 2, 3, 4, 5].map(d => `<option value="${d}" ${L.diff === d ? 'selected' : ''}>${'★'.repeat(d)}</option>`).join('')}</select>
-      <span class="info">${store.progress(L.id) ? '已通关 ' + '★'.repeat(store.progress(L.id).stars) : '未通关'}</span>
+      <div class="nm"><input value="${esc(lvName(L))}" maxlength="16"><div class="info">${L.data.w}×${L.data.h}×${L.data.d} · ${L.data.voxels.length} ${tr('块')}<span class="badge ${L.official ? '' : 'c'}">${L.official ? tr('官方') : tr('玩家')}</span>${L.author ? ' · ' + esc(L.author) : ''}</div></div>
+      <select class="dsel" title="${tr('难度')}">${[1, 2, 3, 4, 5].map(d => `<option value="${d}" ${L.diff === d ? 'selected' : ''}>${'★'.repeat(d)}</option>`).join('')}</select>
+      <span class="info">${store.progress(L.id) ? tr('已通关 ') + '★'.repeat(store.progress(L.id).stars) : tr('未通关')}</span>
       <div class="acts">
-        <button data-a="up" title="上移">${ICON.up}</button>
-        <button data-a="down" title="下移">${ICON.down}</button>
-        <button data-a="play" title="试玩">${ICON.play}</button>
-        <button data-a="edit" title="在工坊中编辑">${ICON.edit}</button>
-        <button data-a="share" title="分享">${ICON.share}</button>
-        <button data-a="official" title="${L.official ? '移到玩家关卡' : '设为官方关卡'}">${L.official ? ICON.star : ICON.sparkle}</button>
-        <button data-a="del" class="del" title="删除">${ICON.trash}</button>
+        <button data-a="up" title="${tr('上移')}">${ICON.up}</button>
+        <button data-a="down" title="${tr('下移')}">${ICON.down}</button>
+        <button data-a="play" title="${tr('试玩')}">${ICON.play}</button>
+        <button data-a="edit" title="${tr('在工坊中编辑')}">${ICON.edit}</button>
+        <button data-a="share" title="${tr('分享')}">${ICON.share}</button>
+        <button data-a="official" title="${L.official ? tr('移到玩家关卡') : tr('设为官方关卡')}">${L.official ? ICON.star : ICON.sparkle}</button>
+        <button data-a="del" class="del" title="${tr('删除')}">${ICON.trash}</button>
       </div>`;
-    $('input', row).onchange = (e) => { store.upsertLevel({ ...L, name: e.target.value.trim() || L.name }); toast('已保存名称'); };
+    $('input', row).onchange = (e) => { store.upsertLevel({ ...L, name: e.target.value.trim() || L.name }); toast(tr('已保存名称')); };
     $('select', row).onchange = (e) => { store.upsertLevel({ ...L, diff: +e.target.value }); };
     $$('.acts button', row).forEach(b => b.onclick = () => {
       audio.play('click');
@@ -674,8 +674,8 @@ function renderAdmin() {
       else if (a === 'share') shareLevelModal(L);
       else if (a === 'official') { store.upsertLevel({ ...L, official: !L.official }); renderAdmin(); }
       else if (a === 'del') modal({
-        title: '删除关卡？', html: `<p>确定删除「${esc(L.name)}」？${L.official ? '（官方关卡可以通过「恢复默认关卡库」找回）' : ''}</p>`,
-        actions: [{ label: '取消' }, { label: '删除', cls: 'pink', ic: 'trash', onClick: () => { store.deleteLevel(L.id); renderAdmin(); } }],
+        title: tr('删除关卡？'), html: `<p>${tr('确定删除“{name}”？', { name: esc(lvName(L)) })}${L.official ? tr('（官方关卡可以通过“恢复默认关卡库”找回）') : ''}</p>`,
+        actions: [{ label: tr('取消') }, { label: tr('删除'), cls: 'pink', ic: 'trash', onClick: () => { store.deleteLevel(L.id); renderAdmin(); } }],
       });
     });
     tb.appendChild(row);
@@ -688,7 +688,7 @@ function bindAdmin() {
     const v = Math.max(1, Math.min(9, store.config.lives + +b.dataset.step));
     store.setConfig({ lives: v }); renderAdmin(); audio.play('click');
   });
-  $('#cfgCasual').onchange = (e) => { store.setConfig({ casual: e.target.checked }); toast(e.target.checked ? '休闲模式：敲错不扣血' : '标准模式'); };
+  $('#cfgCasual').onchange = (e) => { store.setConfig({ casual: e.target.checked }); toast(e.target.checked ? tr('休闲模式：敲错不扣血') : tr('标准模式')); };
   $('#cfgSpeed').oninput = (e) => { store.setConfig({ animSpeed: +e.target.value }); $('#cfgSpeedV').textContent = (+e.target.value).toFixed(2).replace(/0$/, '') + '×'; };
   $('#cfgSfx').oninput = (e) => { store.setConfig({ sfxVol: +e.target.value }); audio.setVolumes(store.config.sfxVol, store.config.bgmVol); };
   $('#cfgSfx').onchange = () => audio.play('break');
@@ -700,14 +700,14 @@ function bindAdmin() {
     else audio.nextSong();
     setTimeout(renderAdmin, 300);
   };
-  $('#adminResetProgress').onclick = () => modal({ title: '清空通关记录？', html: '<p>所有星星和收藏室里的小伙伴都会重新睡着。</p>', actions: [{ label: '取消' }, { label: '清空', cls: 'pink', onClick: () => { store.resetProgress(); renderAdmin(); toast('通关记录已清空'); } }] });
-  $('#adminResetLevels').onclick = () => modal({ title: '恢复默认关卡库？', html: '<p>关卡库会恢复为官方关卡，玩家关卡会被移除（建议先导出备份）。</p>', actions: [{ label: '取消' }, { label: '恢复', cls: 'pink', onClick: () => { store.resetLevels(); renderAdmin(); toast('已恢复默认关卡库'); } }] });
+  $('#adminResetProgress').onclick = () => modal({ title: tr('清空通关记录？'), html: tr('<p>所有星星和收藏室里的小伙伴都会重新睡着。</p>'), actions: [{ label: tr('取消') }, { label: tr('清空'), cls: 'pink', onClick: () => { store.resetProgress(); renderAdmin(); toast(tr('通关记录已清空')); } }] });
+  $('#adminResetLevels').onclick = () => modal({ title: tr('恢复默认关卡库？'), html: tr('<p>关卡库会恢复为官方关卡，玩家关卡会被移除（建议先导出备份）。</p>'), actions: [{ label: tr('取消') }, { label: tr('恢复'), cls: 'pink', onClick: () => { store.resetLevels(); renderAdmin(); toast(tr('已恢复默认关卡库')); } }] });
   $('#adminNew').onclick = () => { app.creator.newDoc(7, 7, 7); goCreator(null, { keep: true }); };
   $('#adminExport').onclick = () => {
     const pack = store.exportPack();
     const blob = new Blob([JSON.stringify(pack, null, 1)], { type: 'application/json' });
     downloadBlob(blob, 'game-pack.json');
-    toast('已导出 game-pack.json');
+    toast(tr('已导出 game-pack.json'));
   };
   $('#adminImport').onchange = async (e) => {
     const f = e.target.files[0];
@@ -716,13 +716,13 @@ function bindAdmin() {
     try {
       const obj = JSON.parse(await f.text());
       modal({
-        title: '导入关卡包', html: `<p>文件里有 ${obj.levels ? obj.levels.length : 0} 个关卡。</p>`,
+        title: tr('导入关卡包'), html: `<p>文件里有 ${obj.levels ? obj.levels.length : 0} 个关卡。</p>`,
         actions: [
-          { label: '追加到关卡库', onClick: () => { const n = store.importPack(obj, 'merge'); renderAdmin(); toast(`已追加 ${n} 个关卡`); } },
-          { label: '替换整个关卡库', cls: 'pink', onClick: () => { const n = store.importPack(obj, 'replace'); renderAdmin(); applyTheme(store.config.theme); toast(`已导入 ${n} 个关卡`); } },
+          { label: tr('追加到关卡库'), onClick: () => { const n = store.importPack(obj, 'merge'); renderAdmin(); toast(`已追加 ${n} 个关卡`); } },
+          { label: tr('替换整个关卡库'), cls: 'pink', onClick: () => { const n = store.importPack(obj, 'replace'); renderAdmin(); applyTheme(store.config.theme); toast(`已导入 ${n} 个关卡`); } },
         ],
       });
-    } catch (err) { toast('导入失败：' + err.message, 3000); }
+    } catch (err) { toast(tr('导入失败：') + err.message, 3000); }
   };
 }
 
@@ -740,12 +740,12 @@ function updateVRPanel() {
   if (app.screen === 'play') vrPlayPanel(panel);
   else if (app.screen === 'collection') {
     panel.set({
-      title: '生态收藏室', sub: `${app.collection.items.length} 位`,
-      info: '用扳机戳戳小伙伴，它们会跳起来！',
+      title: tr('生态收藏室'), sub: `${app.collection.items.length} ${tr('位小伙伴')}`,
+      info: tr('用扳机戳戳小伙伴，它们会跳起来！'),
       buttons: [
-        ...rowButtons(180, [{ id: 'cprev', label: '◀ 上一位' }, { id: 'cnext', label: '下一位 ▶' }], { h: 100 }),
-        ...rowButtons(310, [{ id: 'play', label: '继续闯关', active: true }, { id: 'home', label: '回主页' }], { h: 100 }),
-        ...rowButtons(440, [{ id: 'exit', label: '退出 VR', size: 32 }], { h: 80, x0: 300, x1: 724 }),
+        ...rowButtons(180, [{ id: 'cprev', label: tr('◀ 上一位') }, { id: 'cnext', label: tr('下一位 ▶') }], { h: 100 }),
+        ...rowButtons(310, [{ id: 'play', label: tr('继续闯关'), active: true }, { id: 'home', label: tr('回主页') }], { h: 100 }),
+        ...rowButtons(440, [{ id: 'exit', label: tr('退出 VR'), size: 32 }], { h: 80, x0: 300, x1: 724 }),
       ],
     }, onVRPress);
   } else if (app.screen === 'creator') vrCreatorPanel(panel);
@@ -754,12 +754,12 @@ function updateVRPanel() {
     const off = store.official();
     const done = off.filter(l => store.progress(l.id)).length;
     panel.set({
-      title: CONFIG.GAME_NAME, sub: `${done}/${off.length} 已唤醒`,
-      info: `欢迎来到方块岛！选一项开始吧 · v${CONFIG.VERSION}`,
+      title: gameName(), sub: tr('{done}/{total} 已唤醒', { done, total: off.length }),
+      info: tr('欢迎来到方块岛！选一项开始吧 · v{v}', { v: CONFIG.VERSION }),
       buttons: [
-        ...rowButtons(170, [{ id: 'play', label: '继续闯关 ▶', active: true }, { id: 'levels', label: '选择关卡' }], { h: 110 }),
-        ...rowButtons(305, [{ id: 'create', label: '创造关卡', active: true, color: '#FFCB3D' }, { id: 'coll', label: '收藏室' }], { h: 110 }),
-        ...rowButtons(445, [{ id: 'exit', label: '退出 VR', size: 32 }], { h: 84, x0: 300, x1: 724 }),
+        ...rowButtons(170, [{ id: 'play', label: tr('继续闯关 ▶'), active: true }, { id: 'levels', label: tr('选择关卡') }], { h: 110 }),
+        ...rowButtons(305, [{ id: 'create', label: tr('创造关卡'), active: true, color: '#FFCB3D' }, { id: 'coll', label: tr('收藏室') }], { h: 110 }),
+        ...rowButtons(445, [{ id: 'exit', label: tr('退出 VR'), size: 32 }], { h: 84, x0: 300, x1: 724 }),
       ],
     }, onVRPress);
   }
@@ -772,50 +772,50 @@ function vrPlayPanel(panel) {
   const info = app.play.stateInfo();
   const e = info.entry;
   const test = app.playCtx && app.playCtx.test;
-  const hearts = info.casual ? '休闲模式' : '♥'.repeat(Math.max(0, info.lives)) + '♡'.repeat(Math.max(0, info.maxLives - info.lives));
+  const hearts = info.casual ? tr('休闲模式') : '♥'.repeat(Math.max(0, info.lives)) + '♡'.repeat(Math.max(0, info.maxLives - info.lives));
   if (info.state === 'won' || info.state === 'waking') {
     const r = info.result || { stars: 0, time: 0, mistakes: 0 };
     const nx = nextEntry(e);
     const row1 = test
-      ? [{ id: 'backcr', label: '返回工坊', active: true, color: '#FFCB3D' }, { id: 'again', label: '再试一次' }]
-      : [{ id: 'next', label: nx ? '下一关 ▶' : '全部完成!', active: !!nx, color: '#4FD6A0' }, { id: 'again', label: '再玩一次' }];
+      ? [{ id: 'backcr', label: tr('返回工坊'), active: true, color: '#FFCB3D' }, { id: 'again', label: tr('再试一次') }]
+      : [{ id: 'next', label: nx ? tr('下一关 ▶') : tr('全部完成!'), active: !!nx, color: '#4FD6A0' }, { id: 'again', label: tr('再玩一次') }];
     panel.set({
-      title: `「${e.name}」醒啦！`, sub: '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars),
-      info: `用时 ${fmtTime(r.time)} · 失误 ${r.mistakes} · 扣扳机戳戳它`,
+      title: tr('“{name}”醒啦！', { name: lvName(e) }), sub: '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars),
+      info: tr('用时 {t} · 失误 {m} · 扣扳机戳戳它', { t: fmtTime(r.time), m: r.mistakes }),
       buttons: [
         ...rowButtons(180, row1, { h: 110 }),
-        ...rowButtons(315, [{ id: 'coll', label: '去收藏室' }, { id: 'home', label: '回主页' }], { h: 100 }),
-        ...rowButtons(445, [{ id: 'exit', label: '退出 VR', size: 32 }], { h: 84, x0: 300, x1: 724 }),
+        ...rowButtons(315, [{ id: 'coll', label: tr('去收藏室') }, { id: 'home', label: tr('回主页') }], { h: 100 }),
+        ...rowButtons(445, [{ id: 'exit', label: tr('退出 VR'), size: 32 }], { h: 84, x0: 300, x1: 724 }),
       ],
     }, onVRPress);
   } else if (info.state === 'over') {
     panel.set({
-      title: '方块又睡着啦…', sub: '', info: '没关系，再来一次！',
+      title: tr('方块又睡着啦…'), sub: '', info: tr('没关系，再来一次！'),
       buttons: [
-        ...rowButtons(190, [{ id: 'again', label: '再试一次', active: true }, { id: test ? 'backcr' : 'home', label: test ? '返回工坊' : '回主页' }], { h: 120 }),
-        ...rowButtons(350, [{ id: 'exit', label: '退出 VR', size: 32 }], { h: 84, x0: 300, x1: 724 }),
+        ...rowButtons(190, [{ id: 'again', label: tr('再试一次'), active: true }, { id: test ? 'backcr' : 'home', label: test ? tr('返回工坊') : tr('回主页') }], { h: 120 }),
+        ...rowButtons(350, [{ id: 'exit', label: tr('退出 VR'), size: 32 }], { h: 84, x0: 300, x1: 724 }),
       ],
     }, onVRPress);
   } else {
     panel.set({
       title: displayName(e), sub: hearts, height: 796, top: 56,
-      hint: '左手 X/Y：隐藏/显示面板 ｜ 右手 A/B：切换工具 ｜ 双手侧握：缩放',
-      info: `还要敲 ${info.remaining} 块 · ${fmtTime(info.time)} · 切片 X${info.slice[0]} Y${info.slice[1]} Z${info.slice[2]}`,
+      hint: tr('左手 X/Y：隐藏/显示面板 ｜ 右手 A/B：切换工具 ｜ 双手侧握：缩放'),
+      info: tr('还要敲 {n} 块 · {t} · 切片 X{x} Y{y} Z{z}', { n: info.remaining, t: fmtTime(info.time), x: info.slice[0], y: info.slice[1], z: info.slice[2] }),
       buttons: [
         ...rowButtons(165, [
-          { id: 'tool:break', label: '敲除 (扳机)', active: info.tool === 'break', color: '#FFCB3D' },
-          { id: 'tool:protect', label: '保护 (侧握键)', active: info.tool === 'protect', color: '#4FD6A0' },
+          { id: 'tool:break', label: tr('敲除 (扳机)'), active: info.tool === 'break', color: '#FFCB3D' },
+          { id: 'tool:protect', label: tr('保护 (侧握键)'), active: info.tool === 'protect', color: '#4FD6A0' },
         ], { h: 96 }),
         ...rowButtons(282, [
-          { id: 's:0:1', label: 'X 剥层', size: 30 }, { id: 's:0:-1', label: 'X 还原', size: 30 },
-          { id: 's:1:1', label: 'Y 剥层', size: 30 }, { id: 's:1:-1', label: 'Y 还原', size: 30 },
-          { id: 's:2:1', label: 'Z 剥层', size: 30 }, { id: 's:2:-1', label: 'Z 还原', size: 30 },
+          { id: 's:0:1', label: tr('X 剥层'), size: 30 }, { id: 's:0:-1', label: tr('X 还原'), size: 30 },
+          { id: 's:1:1', label: tr('Y 剥层'), size: 30 }, { id: 's:1:-1', label: tr('Y 还原'), size: 30 },
+          { id: 's:2:1', label: tr('Z 剥层'), size: 30 }, { id: 's:2:-1', label: tr('Z 还原'), size: 30 },
         ], { h: 84, gap: 10 }),
         ...rowButtons(390, test
-          ? [{ id: 'again', label: '重来', size: 32 }, { id: 'backcr', label: '返回工坊', size: 32 }]
-          : [{ id: 'prev', label: '◀ 上一关', size: 32 }, { id: 'again', label: '重来', size: 32 }, { id: 'next', label: '下一关 ▶', size: 32 }], { h: 84 }),
-        ...rowButtons(498, [{ id: 'levels', label: '选择关卡', size: 32 }, { id: 'home', label: '回主页', size: 32 }], { h: 84 }),
-        ...rowButtons(606, [{ id: 'resize', label: '重置大小', size: 30 }, { id: 'exit', label: '退出 VR', size: 30 }], { h: 80 }),
+          ? [{ id: 'again', label: tr('重来'), size: 32 }, { id: 'backcr', label: tr('返回工坊'), size: 32 }]
+          : [{ id: 'prev', label: tr('◀ 上一关'), size: 32 }, { id: 'again', label: tr('重来'), size: 32 }, { id: 'next', label: tr('下一关 ▶'), size: 32 }], { h: 84 }),
+        ...rowButtons(498, [{ id: 'levels', label: tr('选择关卡'), size: 32 }, { id: 'home', label: tr('回主页'), size: 32 }], { h: 84 }),
+        ...rowButtons(606, [{ id: 'resize', label: tr('重置大小'), size: 30 }, { id: 'exit', label: tr('退出 VR'), size: 30 }], { h: 80 }),
       ],
     }, onVRPress);
   }
@@ -829,8 +829,8 @@ function vrLevelsPanel(panel) {
   const slice = list.slice(app.vrLevelPage * per, app.vrLevelPage * per + per);
   const btns = [
     ...rowButtons(150, [
-      { id: 'tab:official', label: '官方关卡', active: app.vrLevelTab === 'official', size: 32 },
-      { id: 'tab:custom', label: '玩家关卡', active: app.vrLevelTab === 'custom', size: 32 },
+      { id: 'tab:official', label: tr('官方关卡'), active: app.vrLevelTab === 'official', size: 32 },
+      { id: 'tab:custom', label: tr('玩家关卡'), active: app.vrLevelTab === 'custom', size: 32 },
     ], { h: 76, x0: 200, x1: 824 }),
   ];
   for (let r = 0; r < 2; r++) {
@@ -838,20 +838,20 @@ function vrLevelsPanel(panel) {
       const p = store.progress(L.id);
       const n = app.vrLevelPage * per + r * 5 + i + 1;
       const showName = p || app.vrLevelTab === 'custom';
-      return { id: 'lv:' + L.id, label: (app.vrLevelTab === 'official' ? n + ' ' : '') + (p ? '★'.repeat(p.stars) : ''), sub: showName ? L.name : `${L.data.w}×${L.data.h}×${L.data.d}`, size: 34, active: !!p, color: '#FFB3CB' };
+      return { id: 'lv:' + L.id, label: (app.vrLevelTab === 'official' ? n + ' ' : '') + (p ? '★'.repeat(p.stars) : ''), sub: showName ? lvName(L) : `${L.data.w}×${L.data.h}×${L.data.d}`, size: 34, active: !!p, color: '#FFB3CB' };
     });
     while (row.length < 5) row.push({ id: 'none' + r + row.length, label: '', sub: '' });
     btns.push(...rowButtons(250 + r * 130, row, { h: 116, gap: 14 }));
   }
   btns.push(...rowButtons(530, [
-    { id: 'page:-1', label: '◀ 上一页', size: 30 },
-    { id: 'home', label: '回主页', size: 30 },
-    { id: 'page:1', label: '下一页 ▶', size: 30 },
+    { id: 'page:-1', label: tr('◀ 上一页'), size: 30 },
+    { id: 'home', label: tr('回主页'), size: 30 },
+    { id: 'page:1', label: tr('下一页 ▶'), size: 30 },
   ], { h: 80 }));
-  btns.push(...rowButtons(630, [{ id: 'exit', label: '退出 VR', size: 30 }], { h: 74, x0: 300, x1: 724 }));
+  btns.push(...rowButtons(630, [{ id: 'exit', label: tr('退出 VR'), size: 30 }], { h: 74, x0: 300, x1: 724 }));
   panel.set({
-    title: '选择关卡', sub: `${app.vrLevelPage + 1}/${pages}`, height: 730,
-    info: list.length ? '用扳机点一个关卡开始' : '还没有玩家关卡，去「创造关卡」做一个吧！',
+    title: tr('选择关卡'), sub: `${app.vrLevelPage + 1}/${pages}`, height: 730,
+    info: list.length ? tr('用扳机点一个关卡开始') : tr('还没有玩家关卡，去“创造关卡”做一个吧！'),
     buttons: btns,
   }, onVRPress);
 }
@@ -860,32 +860,32 @@ function vrCreatorPanel(panel) {
   const cr = app.creator;
   const st = cr.stats();
   const d = cr.doc;
-  const tools = [['add', '添加'], ['erase', '擦除'], ['paint', '上色'], ['pick', '吸管']];
+  const tools = [['add', tr('添加')], ['erase', tr('擦除')], ['paint', tr('上色')], ['pick', tr('吸管')]];
   const btns = [
     ...rowButtons(150, tools.map(([t, n]) => ({ id: 'ct:' + t, label: n, active: cr.tool === t, size: 32 })), { h: 76, gap: 12 }),
   ];
   const sw = PALETTE.map(p => ({ id: 'cc:' + p.c, swatch: p.c, active: p.c.toLowerCase() === String(cr.color).toLowerCase() }));
   btns.push(...rowButtons(244, sw.slice(0, 11), { h: 64, gap: 10 }));
   btns.push(...rowButtons(318, sw.slice(11), { h: 64, gap: 10 }));
-  const pn = ['躯干', '左摆', '右摆', '旋转', '弹跳', '漂浮'];
+  const pn = [tr('躯干'), tr('左摆'), tr('右摆'), tr('旋转'), tr('弹跳'), tr('漂浮')];
   btns.push(...rowButtons(400, PARTS.map(p => ({ id: 'cp:' + p.id, label: p.id + ' ' + pn[p.id], dot: p.color, active: cr.part === p.id, color: '#B08CF0', size: 26 })), { h: 70, gap: 10 }));
   btns.push(...rowButtons(488, [
-    { id: 'cmirror', label: cr.mirror ? '镜像:开' : '镜像:关', active: cr.mirror, color: '#4FD6A0', size: 30 },
-    { id: 'cundo', label: '撤销', size: 30 }, { id: 'credo', label: '重做', size: 30 }, { id: 'cclear', label: '清空', size: 30 },
+    { id: 'cmirror', label: cr.mirror ? tr('镜像:开') : tr('镜像:关'), active: cr.mirror, color: '#4FD6A0', size: 30 },
+    { id: 'cundo', label: tr('撤销'), size: 30 }, { id: 'credo', label: tr('重做'), size: 30 }, { id: 'cclear', label: tr('清空'), size: 30 },
   ], { h: 76, gap: 12 }));
   btns.push(...rowButtons(582, [
-    { id: 'csize:-1', label: '尺寸 −', size: 30 }, { id: 'csize:1', label: '尺寸 +', size: 30 },
-    { id: 'ctpl', label: '换个模板', size: 30 }, { id: 'cnew', label: '空白画布', size: 30 },
+    { id: 'csize:-1', label: tr('尺寸 −'), size: 30 }, { id: 'csize:1', label: tr('尺寸 +'), size: 30 },
+    { id: 'ctpl', label: tr('换个模板'), size: 30 }, { id: 'cnew', label: tr('空白画布'), size: 30 },
   ], { h: 76, gap: 12 }));
   btns.push(...rowButtons(678, [
-    { id: 'cpreview', label: cr.preview ? '停止预览' : '预览唤醒', active: !!cr.preview, color: '#B08CF0', size: 32 },
-    { id: 'ctest', label: '试玩', size: 32 },
-    { id: 'csave', label: '保存关卡', active: true, color: '#FF7EA6', size: 32 },
+    { id: 'cpreview', label: cr.preview ? tr('停止预览') : tr('预览唤醒'), active: !!cr.preview, color: '#B08CF0', size: 32 },
+    { id: 'ctest', label: tr('试玩'), size: 32 },
+    { id: 'csave', label: tr('保存关卡'), active: true, color: '#FF7EA6', size: 32 },
   ], { h: 90, gap: 14 }));
-  btns.push(...rowButtons(790, [{ id: 'home', label: '回主页', size: 30 }, { id: 'exit', label: '退出 VR', size: 30 }], { h: 76 }));
+  btns.push(...rowButtons(790, [{ id: 'home', label: tr('回主页'), size: 30 }, { id: 'exit', label: tr('退出 VR'), size: 30 }], { h: 76 }));
   panel.set({
-    title: '造物工坊 · ' + (d.name || ''), sub: `${st.count} 块`, height: 900,
-    info: `${d.w}×${d.h}×${d.d} · 扳机=当前工具 · 侧握键=擦除 · 摇杆=旋转`,
+    title: tr('造物工坊 · ') + (d.name || ''), sub: `${st.count} ${tr('块')}`, height: 900,
+    info: `${d.w}×${d.h}×${d.d} · ${tr('扳机=当前工具 · 侧握键=擦除 · 摇杆=旋转')}`,
     buttons: btns,
   }, onVRPress);
 }
@@ -906,7 +906,7 @@ function vrSaveCreator() {
   cr.doc.id = saved.id;
   saveDraft();
   audio.play('share');
-  toast('已保存到「玩家关卡」！摘下头显后可在关卡页分享');
+  toast(tr('已保存到“玩家关卡”！摘下头显后可在关卡页分享'));
 }
 
 function onVRPress(id) {
@@ -948,10 +948,10 @@ function onVRPress(id) {
       app.vrTplIndex = (app.vrTplIndex + 1) % all.length;
       cr.loadEntry(all[app.vrTplIndex], true);
       app.world.applyLayout();
-      toast('模板：' + all[app.vrTplIndex].name);
+      toast(tr('模板：') + lvName(all[app.vrTplIndex]));
     }
   } else if (id === 'cnew') { cr.newDoc(7, 7, 7); app.world.applyLayout(); }
-  else if (id === 'cpreview') { if (cr.preview) cr.stopPreview(); else if (!cr.startPreview()) toast('先放几个方块吧～'); }
+  else if (id === 'cpreview') { if (cr.preview) cr.stopPreview(); else if (!cr.startPreview()) toast(tr('先放几个方块吧～')); }
   else if (id === 'ctest') { const err = validateDoc(); if (err) toast(err); else startLevel(cr.toEntry(), { from: 'creator', test: true }); }
   else if (id === 'csave') vrSaveCreator();
   else if (id === 'resize') app.play.resetVRScale();
@@ -962,12 +962,15 @@ function onVRPress(id) {
 
 async function enterVR() {
   audio.unlock();
-  try { await app.world.enterVR(); } catch (e) { toast('无法进入 VR：' + (e.message || e), 3000); }
+  try { await app.world.enterVR(); } catch (e) { toast(tr('无法进入 VR：') + (e.message || e), 3000); }
 }
 
 // ---------- 启动 ----------
 async function boot() {
   hydrateIcons();
+  applyDom();
+  $('#btnLang').textContent = i18n.lang === 'en' ? '中文' : 'English';
+  $('#btnLang').onclick = () => setLang(i18n.lang === 'en' ? 'zh' : 'en');
   // 开发者模式：打开 ?dev=1 开启（只在当前浏览器生效），?dev=0 关闭
   try {
     const dv = new URLSearchParams(location.search).get('dev');
@@ -978,7 +981,7 @@ async function boot() {
   const fontWait = Promise.race([
     Promise.all([
       document.fonts.load('800 64px "Baloo 2"'),
-      document.fonts.load('40px "ZCOOL KuaiLe"', '醒醒吧方块唤醒成功'),
+      document.fonts.load('40px "ZCOOL KuaiLe"', tr('醒醒吧方块唤醒成功')),
     ]).catch(() => {}),
     new Promise(r => setTimeout(r, 2500)),
   ]);
@@ -1019,7 +1022,7 @@ async function boot() {
     audio.setMusic(on);
     audio.play('click');
     updateMusicBtn();
-    toast(on ? '音乐开启 ♪' : '音乐关闭');
+    toast(on ? tr('音乐开启 ♪') : tr('音乐关闭'));
   };
   $$('[data-back]').forEach(b => b.onclick = () => { audio.play('click'); const t = b.dataset.back; if (t === 'home') goHome(); });
   $$('#levelTabs .tab').forEach(t => t.onclick = () => { audio.play('click'); levelTab = t.dataset.tab; renderLevels(); });
@@ -1078,5 +1081,5 @@ async function boot() {
 boot().catch(err => {
   console.error(err);
   const l = $('#loading');
-  if (l) l.querySelector('p').textContent = '加载失败了：' + err.message + '（请使用最新版 Chrome / Edge / Safari 打开）';
+  if (l) l.querySelector('p').textContent = tr('加载失败了：') + err.message + tr('（请使用最新版 Chrome / Edge / Safari 打开）');
 });
