@@ -1,6 +1,6 @@
 // Identity lock: align the original photo to the AI result with face landmarks and blend the
 // original face (eyes, nose, mouth, skin) back in, so only the hair changes.
-import { detectFace, hairMask, FACE_OVAL, ALIGN_PTS } from './vision.js';
+import { detectFace, hairMask, FACE_OVAL, ALIGN_PTS } from './vision.js?v=202610301254';
 
 export function canvasOf(w, h) {
   const c = document.createElement('canvas');
