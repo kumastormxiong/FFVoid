@@ -1,5 +1,10 @@
 // On-device vision: MediaPipe face landmarks (478 pts + head pose) and hair segmentation.
-import { FaceLandmarker, ImageSegmenter } from '../vendor/mediapipe/vision_bundle.mjs';
+// MediaPipe is loaded lazily so the rest of the app works even if it cannot load on a device
+let MP = null;
+async function mp() {
+  if (!MP) MP = await import('../vendor/mediapipe/vision_bundle.mjs');
+  return MP;
+}
 
 const BASE = new URL('../', import.meta.url).href;
 const FILESET = {
@@ -13,6 +18,7 @@ let hairSeg = null;
 let loading = null;
 
 async function makeLandmarker(mode, delegate) {
+  const { FaceLandmarker } = await mp();
   return FaceLandmarker.createFromOptions(FILESET, {
     baseOptions: { modelAssetPath: BASE + 'models/face_landmarker.task', delegate },
     runningMode: mode,
@@ -50,8 +56,8 @@ export async function getVideoLandmarker() {
 
 export function getHairSegmenter() {
   if (!hairSeg) {
-    hairSeg = withFallback((d) =>
-      ImageSegmenter.createFromOptions(FILESET, {
+    hairSeg = withFallback(async (d) =>
+      (await mp()).ImageSegmenter.createFromOptions(FILESET, {
         baseOptions: { modelAssetPath: BASE + 'models/hair_segmenter.tflite', delegate: d },
         runningMode: 'IMAGE',
         outputConfidenceMasks: true,

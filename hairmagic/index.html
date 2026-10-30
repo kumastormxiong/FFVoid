@@ -15,7 +15,49 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./css/app.css?v=2" />
+  <link rel="stylesheet" href="./css/app.css?v=3" />
+  <script>
+    /* boot watchdog: shows a readable message and reports the error if the app cannot start */
+    (function () {
+      var sent = 0;
+      function report(m) {
+        try {
+          if (sent++ > 6) return;
+          var x = new XMLHttpRequest();
+          x.open('POST', './api/log');
+          x.setRequestHeader('content-type', 'application/json');
+          x.send(JSON.stringify({ msg: String(m).slice(0, 1500), ua: navigator.userAgent, url: location.href }));
+        } catch (e) {}
+      }
+      function show(m) {
+        var d = document.getElementById('bootErr');
+        if (!d) {
+          d = document.createElement('div');
+          d.id = 'bootErr';
+          d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:88px;z-index:999;background:#14161b;color:#fff;padding:12px 14px;border-radius:12px;font:13px/1.55 system-ui,sans-serif';
+          (document.body || document.documentElement).appendChild(d);
+        }
+        d.textContent = m;
+      }
+      window.__hmReport = report;
+      window.__hmShow = show;
+      window.addEventListener('error', function (e) {
+        var m = (e.message || 'error') + (e.filename ? ' @' + e.filename.split('/').pop() + ':' + e.lineno : '');
+        report('error: ' + m);
+        if (!window.__hmBooted) show('页面脚本出错：' + m);
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason;
+        report('rejection: ' + ((r && (r.stack || r.message)) || r));
+      });
+      setTimeout(function () {
+        if (!window.__hmBooted) {
+          report('boot timeout');
+          show('页面没有加载完成。请用最新版 Safari 或 Chrome 打开 ffvoid.com/hairmagic；如果是在微信等 App 里打开的，请点右上角选择“在浏览器中打开”。');
+        }
+      }, 9000);
+    })();
+  </script>
   <script type="importmap">
     {
       "imports": {
@@ -278,6 +320,7 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script type="module" src="./js/app.js?v=2"></script>
+  <script type="module" src="./js/app.js?v=3"></script>
+  <script nomodule>document.body.insertAdjacentHTML("beforeend","<div style=\"position:fixed;inset:auto 12px 88px;background:#14161b;color:#fff;padding:12px;border-radius:12px\">这个浏览器太旧，无法运行 HairMagic。请更新系统或改用最新版 Safari / Chrome。</div>")</script>
 </body>
 </html>

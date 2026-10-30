@@ -1131,6 +1131,7 @@ function bind() {
 }
 
 async function init() {
+  window.__hmBooted = true;
   bind();
   store.persist();
   await loadDate(store.today());
@@ -1147,4 +1148,8 @@ async function init() {
   idle(() => loadVision().catch((e) => console.warn('vision preload failed', e)));
 }
 
-init();
+init().catch((e) => {
+  console.error(e);
+  if (window.__hmReport) window.__hmReport('init: ' + (e && (e.stack || e.message)));
+  if (window.__hmShow) window.__hmShow('启动出错：' + (e && e.message));
+});

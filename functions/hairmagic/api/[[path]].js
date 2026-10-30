@@ -378,6 +378,20 @@ export async function onRequest(context) {
     }
   }
   if (request.method === 'POST' && !originOk(request)) return json({ error: 'origin not allowed' }, 403);
+  if (route === 'log' && request.method === 'POST') {
+    // client error reports (boot watchdog) — small, best effort
+    try {
+      const b = await request.json();
+      if (env.DB) {
+        await env.DB.batch([
+          env.DB.prepare('CREATE TABLE IF NOT EXISTS logs (t INTEGER, ua TEXT, url TEXT, msg TEXT)'),
+          env.DB.prepare('INSERT INTO logs (t, ua, url, msg) VALUES (?, ?, ?, ?)').bind(Date.now(), clean(b.ua, 300), clean(b.url, 200), clean(b.msg, 1500)),
+          env.DB.prepare('DELETE FROM logs WHERE t < ?').bind(Date.now() - 14 * 86400000),
+        ]);
+      }
+    } catch {}
+    return json({ ok: true });
+  }
   if (route === 'health') return json({ ok: true, ai: !!env.AI, db: !!env.DB, worker_auth: !!env.HM_WORKER_TOKEN, models: Object.keys(MODELS) });
   if (route === 'analyze') {
     if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
