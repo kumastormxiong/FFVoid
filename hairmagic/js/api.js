@@ -64,7 +64,13 @@ export async function health() {
 
 export function errorText(e) {
   const code = e && e.code;
-  if (code === 'quota') return '今日 AI 额度已用完，明天再来，或改用"极速"模式';
+  if (code === 'quota') {
+    const reset = new Date();
+    reset.setUTCHours(24, 0, 0, 0);
+    const hh = String(reset.getHours()).padStart(2, '0');
+    const mm = String(reset.getMinutes()).padStart(2, '0');
+    return `今天的免费 AI 额度已用完，将在 ${hh}:${mm} 重置`;
+  }
   if (code === 'timeout') return '生成超时，网络较慢时请重试';
   if (code === 'network') return '网络连接失败，请检查网络后重试';
   if (code === 'origin not allowed') return '请通过 ffvoid.com/hairmagic 访问';

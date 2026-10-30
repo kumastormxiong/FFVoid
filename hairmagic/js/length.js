@@ -121,7 +121,8 @@ export async function geometricEstimate(canvas, face) {
   const belowEar = (bottom - earY) * cmPerPx;
   const back = belowEar > 1 ? 9 + belowEar * 1.05 : Math.max(0.6, topThick * 1.4);
   const side = belowEar > 1 ? Math.max(3, belowEar + 3) : Math.max(0.5, topThick * 0.8);
-  const top = Math.max(0.8, topThick * 2.2, fringe * cmPerPx + 6 * (fringe > 0));
+  // the top is rarely shorter than what hangs at the sides; a fringe adds forehead length
+  const top = Math.max(0.8, topThick * 2.2, fringe > 0 ? fringe * cmPerPx + 6 : 0, belowEar > 1 ? side * 0.85 : 0);
   const r = (v) => Math.round(v * 2) / 2;
   return { top: r(Math.min(top, back + 6)), side: r(side), back: r(Math.max(back, side)), source: 'geometry' };
 }

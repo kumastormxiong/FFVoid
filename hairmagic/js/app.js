@@ -130,7 +130,8 @@ function renderLen() {
     return;
   }
   const l = S.len;
-  el.innerHTML = `${describeLength(l)} <small>顶 ${cm(l.top)} · 侧 ${cm(l.side)} · 后 ${cm(l.back)} cm</small>`;
+  const rough = l.source === 'geometry' || l.source === 'default' ? ' · 粗估，点右侧校准' : '';
+  el.innerHTML = `${describeLength(l)} <small>顶 ${cm(l.top)} · 侧 ${cm(l.side)} · 后 ${cm(l.back)} cm${rough}</small>`;
 }
 
 // ---------------------------------------------------------------- data loading
