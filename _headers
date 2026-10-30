@@ -9,3 +9,29 @@
 
 /cube/*
   Cache-Control: no-cache
+
+# HairMagic needs the front camera: lift the site-wide camera block for /hairmagic only
+/hairmagic
+  ! Permissions-Policy
+
+/hairmagic/
+  ! Permissions-Policy
+  Cache-Control: no-cache
+
+/hairmagic/*
+  ! Permissions-Policy
+
+/hairmagic/index.html
+  Cache-Control: no-cache
+
+/hairmagic/js/*
+  Cache-Control: no-cache
+
+/hairmagic/css/*
+  Cache-Control: no-cache
+
+/hairmagic/models/*
+  Cache-Control: public, max-age=2592000
+
+/hairmagic/vendor/*
+  Cache-Control: public, max-age=2592000

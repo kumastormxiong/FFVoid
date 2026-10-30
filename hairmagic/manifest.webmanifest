@@ -1,0 +1,14 @@
+{
+  "name": "HairMagic 发型魔镜",
+  "short_name": "HairMagic",
+  "start_url": "/hairmagic/",
+  "scope": "/hairmagic/",
+  "display": "standalone",
+  "background_color": "#e9ecf0",
+  "theme_color": "#e9ecf0",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
