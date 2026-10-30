@@ -143,3 +143,7 @@ export const prefs = {
     } catch {}
   },
 };
+
+export async function updateLook(rec) {
+  await tx('looks', 'readwrite', (s) => s.put(rec));
+}

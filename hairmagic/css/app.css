@@ -371,6 +371,51 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 @keyframes sheetIn { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
+/* ---------- catalogue toggle ---------- */
+.line-toggle { display: flex; gap: 8px; margin-top: 22px; }
+.line-btn {
+  flex: 1; height: 44px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--white);
+  font-weight: 600; font-size: 14px; color: var(--ink-2); transition: background .2s, color .2s, border-color .2s;
+}
+.line-btn.is-on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.line-toggle + .seg { margin-top: 10px; }
+.style-img { position: relative; }
+.style-ph { display: none; }
+.style-img.is-missing { display: grid; place-items: center; background: radial-gradient(circle at 50% 38%, #f3f4f7 0 28%, #e3e6eb 29% 100%); }
+.style-img.is-missing .style-ph { display: block; font-size: 12px; color: var(--ink-3); font-weight: 500; }
+.icon-btn-3d { background: var(--ink); color: #fff; }
+
+/* ---------- 3D viewer ---------- */
+.viewer3d {
+  position: fixed; inset: 0; z-index: 110; color: #fff; overflow: hidden;
+  background: radial-gradient(120% 80% at 50% 35%, #2a2f3a 0%, #12151b 60%, #0a0c10 100%);
+}
+.v3-canvas { position: absolute; inset: 0; touch-action: none; }
+.v3-canvas canvas { width: 100% !important; height: 100% !important; display: block; }
+.v3-top { position: absolute; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top, 0px) + 12px) var(--gutter) 24px; display: flex; gap: 12px; align-items: center; pointer-events: none; }
+.v3-top > * { pointer-events: auto; }
+.v3-title { display: flex; flex-direction: column; }
+.v3-title strong { font-size: 18px; font-weight: 600; }
+.v3-title span { font-size: 12px; color: rgba(255,255,255,.6); }
+.v3-panel {
+  position: absolute; left: var(--gutter); right: var(--gutter); top: 50%; transform: translateY(-50%);
+  max-width: 420px; margin: 0 auto; text-align: center;
+}
+.v3-status { font-size: 20px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.01em; }
+.v3-sub { font-size: 13.5px; color: rgba(255,255,255,.7); margin: 0 0 18px; line-height: 1.6; }
+.v3-progress { height: 4px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; margin: 0 auto 20px; max-width: 280px; }
+.v3-progress span { display: block; height: 100%; width: 0; background: var(--sheen); transition: width .6s ease; }
+.v3-tools { position: absolute; left: 0; right: 0; bottom: 0; padding: 30px var(--gutter) calc(var(--safe-b) + 18px); background: linear-gradient(transparent, rgba(0,0,0,.55)); text-align: center; }
+.v3-hint { margin: 0 0 12px; font-size: 12.5px; color: rgba(255,255,255,.7); }
+.v3-btns { display: flex; gap: 8px; justify-content: center; }
+.viewer3d .icon-btn { background: rgba(255,255,255,.14); color: #fff; }
+.viewer3d .icon-btn[aria-pressed="true"] { background: #fff; color: var(--ink); }
+.viewer3d:not([data-state="view"]) .v3-tools { display: none; }
+.viewer3d[data-state="view"] .v3-panel { display: none; }
+.viewer3d:not([data-state="intro"]):not([data-state="error"]) .v3-train { display: none; }
+.viewer3d[data-state="intro"] .v3-progress, .viewer3d[data-state="error"] .v3-progress { display: none; }
+.viewer3d[data-state="error"] .v3-train::after { content: ''; }
+
 /* ---------- wide screens ---------- */
 @media (min-width: 900px) {
   .studio { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 32px; align-items: start; padding-top: 8px; }

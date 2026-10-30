@@ -142,7 +142,8 @@ const HAIR_PROMPT =
   'the overall length), side = strands growing above the ears, back = the longest strands at the ' +
   'back/nape. Use face size for scale (hairline to chin is about 18 cm). Also judge texture. ' +
   'Reply with ONLY one line of JSON, no markdown: ' +
-  '{"top_cm":number,"side_cm":number,"back_cm":number,"texture":"straight|wavy|curly|coily","bangs":true|false}';
+  '{"top_cm":number,"side_cm":number,"back_cm":number,"texture":"straight|wavy|curly|coily","bangs":true|false,' +
+  '"style_line":"mens|womens"} where style_line is whether men\'s or women\'s haircut catalogues would suit this person\'s current look best.';
 
 async function analyze(request, env) {
   if (!env.AI) return json({ error: 'AI binding missing on this deployment' }, 503);
@@ -190,15 +191,194 @@ async function analyze(request, env) {
     back: num(j.back_cm),
     texture: ['straight', 'wavy', 'curly', 'coily'].includes(j.texture) ? j.texture : 'straight',
     bangs: !!j.bangs,
+    line: j.style_line === 'womens' ? 'female' : j.style_line === 'mens' ? 'male' : null,
     source: 'vlm',
   });
+}
+
+
+// ---------------------------------------------------------------- 3DGS job queue (D1)
+// Phone: POST gs/jobs, GET gs/jobs/:id, GET gs/jobs/:id/result, GET gs/status
+// GPU worker (Bearer HM_WORKER_TOKEN): POST gs/worker/claim, GET gs/worker/jobs/:id/view/:i,
+//   POST gs/worker/jobs/:id/progress, PUT gs/worker/jobs/:id/result?part&total&type, POST gs/worker/jobs/:id/fail
+const CHUNK = 900 * 1024;
+const MAX_QUEUED = 20;
+const WORKER_ONLINE_MS = 45000;
+
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+
+async function putBlob(db, jobId, kind, buf) {
+  const bytes = new Uint8Array(buf);
+  const parts = Math.max(1, Math.ceil(bytes.length / CHUNK));
+  const stmts = [db.prepare('DELETE FROM blobs WHERE job_id = ? AND kind = ?').bind(jobId, kind)];
+  for (let i = 0; i < parts; i++) {
+    stmts.push(
+      db.prepare('INSERT INTO blobs (job_id, kind, part, data) VALUES (?, ?, ?, ?)')
+        .bind(jobId, kind, i, bytes.slice(i * CHUNK, (i + 1) * CHUNK))
+    );
+  }
+  await db.batch(stmts);
+  return parts;
+}
+
+async function getBlob(db, jobId, kind) {
+  const { results } = await db.prepare('SELECT data FROM blobs WHERE job_id = ? AND kind = ? ORDER BY part').bind(jobId, kind).all();
+  if (!results.length) return null;
+  const arrs = results.map((r) => new Uint8Array(r.data));
+  const total = arrs.reduce((a, b) => a + b.length, 0);
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out;
+}
+
+async function workerOnline(db) {
+  const row = await db.prepare('SELECT MAX(last_seen) AS t FROM workers').first();
+  const t = (row && row.t) || 0;
+  return { online: Date.now() - t < WORKER_ONLINE_MS, lastSeen: t };
+}
+
+function isWorker(request, env) {
+  const auth = request.headers.get('authorization') || '';
+  return !!env.HM_WORKER_TOKEN && auth === 'Bearer ' + env.HM_WORKER_TOKEN;
+}
+
+async function gsRoute(parts, request, env) {
+  const db = env.DB;
+  if (!db) return json({ error: 'DB binding missing' }, 503);
+  const m = request.method;
+
+  if (parts[0] === 'status' && m === 'GET') {
+    const w = await workerOnline(db);
+    const q = await db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('queued','running')").first();
+    return json({ worker_online: w.online, last_seen: w.lastSeen, active: q.n });
+  }
+
+  if (parts[0] === 'jobs' && parts.length === 1 && m === 'POST') {
+    const q = await db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE status = 'queued'").first();
+    if (q.n >= MAX_QUEUED) return json({ error: 'queue_full' }, 429);
+    let form;
+    try { form = await request.formData(); } catch { return json({ error: 'expected multipart form data' }, 400); }
+    const id = newId();
+    let views = 0;
+    for (let i = 0; i < 5; i++) {
+      const f = form.get('view' + i);
+      if (!f || typeof f === 'string') break;
+      if (f.size > 2 * 1024 * 1024) return json({ error: 'view too large' }, 400);
+      const buf = await f.arrayBuffer();
+      if (!sniffImage(buf)) return json({ error: 'view is not an image' }, 400);
+      await putBlob(db, id, 'view' + i, buf);
+      views++;
+    }
+    if (!views) return json({ error: 'at least one view is required' }, 400);
+    const meta = clean(form.get('meta'), 20000) || '{}';
+    try { JSON.parse(meta); } catch { return json({ error: 'meta must be JSON' }, 400); }
+    await db.prepare('INSERT INTO jobs (id, created, status, stage, label, meta, views) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, Date.now(), 'queued', 'queued', clean(form.get('label'), 120), meta, views).run();
+    return json({ id });
+  }
+
+  if (parts[0] === 'jobs' && parts[1] && m === 'GET') {
+    const job = await db.prepare('SELECT id, created, status, stage, progress, label, views, started, finished, error, result_size, result_type FROM jobs WHERE id = ?').bind(parts[1]).first();
+    if (!job) return json({ error: 'not found' }, 404);
+    if (parts[2] === 'result') {
+      if (job.status !== 'done') return json({ error: 'not ready' }, 409);
+      const data = await getBlob(db, job.id, 'result');
+      if (!data) return json({ error: 'result missing' }, 410);
+      return new Response(data, {
+        headers: { 'content-type': 'application/octet-stream', 'x-hm-type': job.result_type || 'splat', 'cache-control': 'private, max-age=86400' },
+      });
+    }
+    let ahead = 0;
+    if (job.status === 'queued') {
+      const r = await db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE status = 'queued' AND created < ?").bind(job.created).first();
+      ahead = r.n;
+    }
+    const w = await workerOnline(db);
+    return json({ ...job, ahead, worker_online: w.online });
+  }
+
+  // ---- worker endpoints
+  if (parts[0] === 'worker') {
+    if (!isWorker(request, env)) return json({ error: 'unauthorized' }, 401);
+    const wid = (request.headers.get('x-hm-worker') || 'worker').slice(0, 60);
+    const now = Date.now();
+    if (parts[1] === 'claim' && m === 'POST') {
+      let info = '';
+      try { info = JSON.stringify(await request.json()).slice(0, 2000); } catch {}
+      await db.batch([
+        db.prepare('INSERT INTO workers (id, last_seen, info) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET last_seen = excluded.last_seen, info = excluded.info').bind(wid, now, info),
+        // requeue jobs whose worker vanished; expire old data
+        db.prepare("UPDATE jobs SET status = 'queued', stage = 'requeued' WHERE status = 'running' AND started < ?").bind(now - 15 * 60000),
+        db.prepare('DELETE FROM blobs WHERE job_id IN (SELECT id FROM jobs WHERE created < ?)').bind(now - 7 * 86400000),
+        db.prepare('DELETE FROM jobs WHERE created < ?').bind(now - 7 * 86400000),
+      ]);
+      const job = await db.prepare(
+        "UPDATE jobs SET status = 'running', stage = 'claimed', worker = ?, started = ? WHERE id = (SELECT id FROM jobs WHERE status = 'queued' ORDER BY created LIMIT 1) RETURNING id, label, meta, views"
+      ).bind(wid, now).first();
+      return json({ job: job || null });
+    }
+    const jobId = parts[2];
+    if (parts[1] === 'jobs' && jobId) {
+      if (parts[3] === 'view' && m === 'GET') {
+        const data = await getBlob(db, jobId, 'view' + (parseInt(parts[4], 10) || 0));
+        if (!data) return json({ error: 'not found' }, 404);
+        return new Response(data, { headers: { 'content-type': 'image/jpeg' } });
+      }
+      if (parts[3] === 'progress' && m === 'POST') {
+        const b = await request.json().catch(() => ({}));
+        await db.batch([
+          db.prepare('UPDATE jobs SET stage = ?, progress = ? WHERE id = ?').bind(clean(b.stage, 60), Number(b.progress) || 0, jobId),
+          db.prepare('UPDATE workers SET last_seen = ? WHERE id = ?').bind(now, wid),
+        ]);
+        return json({ ok: true });
+      }
+      if (parts[3] === 'result' && m === 'PUT') {
+        const url = new URL(request.url);
+        const part = parseInt(url.searchParams.get('part'), 10) || 0;
+        const total = parseInt(url.searchParams.get('total'), 10) || 1;
+        const type = (url.searchParams.get('type') || 'splat').replace(/[^a-z]/g, '').slice(0, 10);
+        const buf = new Uint8Array(await request.arrayBuffer());
+        if (buf.length > CHUNK) return json({ error: 'chunk too large' }, 413);
+        const stmts = [];
+        if (part === 0) stmts.push(db.prepare("DELETE FROM blobs WHERE job_id = ? AND kind = 'result'").bind(jobId));
+        stmts.push(db.prepare("INSERT INTO blobs (job_id, kind, part, data) VALUES (?, 'result', ?, ?)").bind(jobId, part, buf));
+        if (part === total - 1) {
+          stmts.push(db.prepare(
+            "UPDATE jobs SET status = 'done', stage = 'done', progress = 1, finished = ?, result_parts = ?, result_type = ?, result_size = (SELECT SUM(LENGTH(data)) FROM blobs WHERE job_id = ? AND kind = 'result') + 0 WHERE id = ?"
+          ).bind(now, total, type, jobId, jobId));
+        }
+        await db.batch(stmts);
+        if (part === total - 1) {
+          // views are no longer needed once the model is trained
+          await db.prepare("DELETE FROM blobs WHERE job_id = ? AND kind LIKE 'view%'").bind(jobId).run();
+        }
+        return json({ ok: true });
+      }
+      if (parts[3] === 'fail' && m === 'POST') {
+        const b = await request.json().catch(() => ({}));
+        await db.prepare("UPDATE jobs SET status = 'error', stage = 'error', error = ?, finished = ? WHERE id = ?").bind(clean(b.error, 500), now, jobId).run();
+        return json({ ok: true });
+      }
+    }
+  }
+  return json({ error: 'not found' }, 404);
 }
 
 export async function onRequest(context) {
   const { request, env, params } = context;
   const route = (params.path || []).join('/');
+  const parts = params.path || [];
+  if (parts[0] === 'gs') {
+    if (parts[1] !== 'worker' && request.method !== 'GET' && !originOk(request)) return json({ error: 'origin not allowed' }, 403);
+    try {
+      return await gsRoute(parts.slice(1), request, env);
+    } catch (e) {
+      return json({ error: 'gs_error', detail: String((e && e.message) || e).slice(0, 300) }, 500);
+    }
+  }
   if (request.method === 'POST' && !originOk(request)) return json({ error: 'origin not allowed' }, 403);
-  if (route === 'health') return json({ ok: true, ai: !!env.AI, models: Object.keys(MODELS) });
+  if (route === 'health') return json({ ok: true, ai: !!env.AI, db: !!env.DB, worker_auth: !!env.HM_WORKER_TOKEN, models: Object.keys(MODELS) });
   if (route === 'analyze') {
     if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
     return analyze(request, env);

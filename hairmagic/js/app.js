@@ -5,7 +5,7 @@ import {
   NEEDS, LENGTH_PRESETS, SEED_LENGTH_NEEDS, GROWTH_CM_PER_MONTH,
   monthsNeeded, gapDetail, describeLength, geometricEstimate,
 } from './length.js';
-import { generateLook, analyzeHair, errorText } from './api.js';
+import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js';
 import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js';
 import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js';
 import {
@@ -36,6 +36,7 @@ const S = {
   shape: null,
   busy: false,
   compare: false,
+  line: store.prefs.get('line', null) || 'm', // 'm' men's / 'f' women's catalogue
 };
 
 // ---------------------------------------------------------------- object URLs
@@ -91,12 +92,13 @@ function normalizeLen(l) {
 async function ensureHairLength() {
   const key = 'len.' + S.date;
   const saved = store.prefs.get(key, null);
-  if (saved) {
+  if (saved && (saved.source === 'vlm' || saved.source === 'manual')) {
     S.len = saved;
     renderLen();
     return;
   }
-  S.len = null;
+  // rough or missing estimate: show what we have, then try the AI estimate again
+  S.len = saved || null;
   renderLen();
   const front = S.photos.find((p) => p.angle === 'front') || S.photos[0];
   if (!front) return;
@@ -104,8 +106,13 @@ async function ensureHairLength() {
   try {
     const small = await resizeBlob(front.blob, 384, 512, 0.88);
     est = normalizeLen(await analyzeHair(small));
+    if (est && est.line && !store.prefs.get('line', null)) {
+      S.line = est.line === 'female' ? 'f' : 'm';
+      renderLine();
+    }
   } catch (e) {
     console.warn('VLM hair estimate failed', e);
+    if (saved) return;
     try {
       const c = toCanvas(await loadBitmap(front.blob));
       const face = await detectFace(c);
@@ -177,6 +184,7 @@ function renderStudio() {
   renderLooks();
   renderLen();
   renderMode();
+  renderLine();
   renderColors();
   renderOptions();
   renderSummary();
@@ -236,6 +244,7 @@ function renderStage() {
     info.textContent = look.label + (look.seed && look.kind === 'seed' ? ` · #${look.seed}` : '');
   } else info.hidden = true;
   $('#btnSave').hidden = !look;
+  $('#btn3d').hidden = !look;
   $('#btnCompare').hidden = !look;
   if (!look && S.compare) setCompare(false);
   applyCompare();
@@ -302,6 +311,17 @@ function styleMonths(id) {
   return S.len ? monthsNeeded(NEEDS[id], S.len) : 0;
 }
 
+function renderLine() {
+  $$('.line-btn').forEach((b) => {
+    const on = b.dataset.line === S.line;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', on);
+  });
+  if (S.mode === 'seed') renderSeed();
+  else renderStyles();
+  renderSummary();
+}
+
 function renderMode() {
   $$('.seg-btn').forEach((b) => {
     const on = b.dataset.mode === S.mode;
@@ -317,8 +337,8 @@ function renderMode() {
 
 function renderStyles() {
   if (S.mode === 'seed') return;
-  const rec = new Set(suggestForFace(S.shape));
-  let list = STYLES.map((s) => ({ s, months: styleMonths(s.id), rec: rec.has(s.id) }));
+  const rec = new Set(suggestForFace(S.shape, S.line));
+  let list = STYLES.filter((s) => s.g === S.line).map((s) => ({ s, months: styleMonths(s.id), rec: rec.has(s.id) }));
   const nowCount = list.filter((x) => x.months === 0).length;
   if (S.mode === 'now') list = list.filter((x) => x.months === 0);
   list.sort((a, b) => a.months - b.months || b.rec - a.rec);
@@ -328,7 +348,7 @@ function renderStyles() {
   const lenTxt = S.len ? describeLength(S.len) : '';
   const shapeTxt = S.shape ? `，${FACE_SHAPE_ZH[S.shape]}推荐款标 ★` : '';
   note.textContent = S.mode === 'now'
-    ? (S.len ? `按你现在的发长（${lenTxt}），这 ${nowCount} 款现在就能剪${shapeTxt}。` : '正在估算你的发长…')
+    ? (S.len ? `按你现在的发长（${lenTxt}），${S.line === 'f' ? '女士' : '男士'}发型里这 ${nowCount} 款现在就能剪${shapeTxt}。` : '正在估算你的发长…')
     : `需要留长的发型会标出大约要留几个月（按每月 ${GROWTH_CM_PER_MONTH} cm）。`;
 
   const grid = $('#styleGrid');
@@ -341,7 +361,7 @@ function renderStyles() {
     const meta = months
       ? `<div class="style-meta is-grow">需留发约 ${months} 个月</div>`
       : `<div class="style-meta is-ok">${svc ? '现在可做 · 需' + svc : '现在可剪'}</div>`;
-    b.innerHTML = `<div class="style-img"><img loading="lazy" alt="" src="./assets/styles/${s.id}.jpg"></div>${r ? '<span class="badge-rec">★ 推荐</span>' : ''}<div class="style-body"><div class="style-name">${s.zh}</div>${meta}</div>`;
+    b.innerHTML = `<div class="style-img"><img loading="lazy" alt="" src="./assets/styles/${s.id}.jpg" onerror="this.parentNode.classList.add('is-missing');this.remove()"><span class="style-ph">${s.en}</span></div>${r ? '<span class="badge-rec">★ 推荐</span>' : ''}<div class="style-body"><div class="style-name">${s.zh}</div>${meta}</div>`;
     b.onclick = () => {
       S.styleId = s.id;
       $$('.style', grid).forEach((x) => x.classList.toggle('is-on', x.dataset.id === s.id));
@@ -363,7 +383,7 @@ function allowedSeedLengths() {
 }
 
 function currentSeedStyle() {
-  return styleFromSeed(S.seed, { randomColor: S.seedColor, allowedLengths: allowedSeedLengths() });
+  return styleFromSeed(S.seed, { randomColor: S.seedColor, allowedLengths: allowedSeedLengths(), line: S.line });
 }
 
 function renderSeed() {
@@ -856,6 +876,172 @@ function urlForArchive(rec) {
   return archiveUrls.get(rec.id);
 }
 
+
+// ---------------------------------------------------------------- 3D Gaussian Splatting
+let viewer = null;
+let pollT = 0;
+let v3Holder = null;
+
+const setItems = () => S.looks.filter((l) => l.setId === S.set);
+const photoOf = (id) => S.photos.find((p) => p.id === id);
+const ANGLE_RANK = { front: 0, left: 1, right: 2, up: 3, down: 4, other: 5 };
+
+function gsHolder() {
+  const items = setItems();
+  return (
+    items.find((l) => l.gsBlob || l.gsJob) ||
+    items.find((l) => (photoOf(l.photoId) || {}).angle === 'front') ||
+    items[0] || null
+  );
+}
+
+function v3State(state, text = '', sub = '') {
+  const ov = $('#viewer3d');
+  ov.dataset.state = state;
+  $('#v3Train').textContent = state === 'error' ? '重新训练' : '开始训练 3D 头像';
+  $('#v3Status').textContent = text;
+  $('#v3Sub').textContent = sub;
+}
+
+async function open3D() {
+  const h = gsHolder();
+  if (!h) return;
+  v3Holder = h;
+  $('#viewer3d').hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('#v3Title').textContent = h.label || '3D 发型';
+  if (h.gsBlob) return showSplat(h.gsBlob);
+  if (h.gsJob) return pollJob();
+  const n = setItems().length;
+  const st = await gsStatus();
+  v3State(
+    'intro',
+    n > 1 ? `用这组 ${n} 个角度训练 3D 头像` : '用这 1 张照片生成 3D 头像',
+    (n > 1
+      ? '先用人头先验（LAM）把正面照变成 3D 高斯点，再用其他角度做多视角训练。'
+      : '只有一个角度时主要依赖人头先验，后脑勺是推测的。先用「全部角度」生成能训练得更准。') +
+      (st.worker_online ? ' 训练节点在线，约 1–3 分钟。' : ' 训练节点目前离线：任务会排队，等你的电脑开机运行训练节点后自动开始。')
+  );
+}
+
+function close3D() {
+  clearTimeout(pollT);
+  if (viewer) {
+    viewer.dispose();
+    viewer = null;
+  }
+  $('#viewer3d').hidden = true;
+  document.body.style.overflow = '';
+}
+
+async function start3DJob() {
+  const items = setItems().sort(
+    (a, b) => (ANGLE_RANK[(photoOf(a.photoId) || {}).angle] ?? 9) - (ANGLE_RANK[(photoOf(b.photoId) || {}).angle] ?? 9)
+  );
+  if (!items.length) return;
+  v3State('training', '正在上传照片…', '');
+  try {
+    const views = await Promise.all(items.slice(0, 5).map((l) => resizeBlob(l.blob, 768, 1024, 0.9)));
+    const meta = {
+      angles: items.slice(0, 5).map((l) => (photoOf(l.photoId) || {}).angle || 'other'),
+      yaw: items.slice(0, 5).map((l) => (photoOf(l.photoId) || {}).yawG ?? null),
+      label: items[0].label,
+      date: S.date,
+    };
+    const { id } = await createGsJob({ views, meta, label: items[0].label });
+    const h = gsHolder();
+    h.gsJob = id;
+    await store.updateLook(h);
+    v3Holder = h;
+    pollJob();
+  } catch (e) {
+    console.error(e);
+    v3State('error', e.code === 'queue_full' ? '训练队列已满，请稍后再试' : '上传失败', errorText(e));
+  }
+}
+
+const STAGE_ZH = (st) => {
+  if (!st) return '';
+  return st;
+};
+
+async function pollJob() {
+  clearTimeout(pollT);
+  const h = v3Holder;
+  if (!h || !h.gsJob || $('#viewer3d').hidden) return;
+  let j;
+  try {
+    j = await gsJob(h.gsJob);
+  } catch (e) {
+    if (e.code === 'job_missing') {
+      delete h.gsJob;
+      await store.updateLook(h);
+      v3State('error', '训练任务已过期', '重新开始训练即可');
+      return;
+    }
+    pollT = setTimeout(pollJob, 5000);
+    return;
+  }
+  if (j.status === 'done') {
+    v3State('training', '训练完成，正在下载 3D 模型…', '');
+    try {
+      const blob = await gsResult(h.gsJob);
+      h.gsBlob = blob;
+      h.gsAt = Date.now();
+      delete h.gsJob;
+      await store.updateLook(h);
+      S.looks = await store.looksByDate(S.date);
+      return showSplat(blob);
+    } catch (e) {
+      pollT = setTimeout(pollJob, 4000);
+      return;
+    }
+  }
+  if (j.status === 'error') {
+    delete h.gsJob;
+    await store.updateLook(h);
+    v3State('error', '3D 训练失败', j.error || '请重试');
+    return;
+  }
+  const pct = Math.round((j.progress || 0) * 100);
+  if (j.status === 'queued') {
+    v3State(
+      'training',
+      j.worker_online ? (j.ahead ? `排队中，前面还有 ${j.ahead} 个任务` : '训练节点即将开始…') : '已排队，等待训练节点上线',
+      j.worker_online ? '' : '训练节点是你电脑上的 GPU 程序，开机并运行后会自动接单。可以先关闭这个页面，稍后回来查看。'
+    );
+  } else {
+    v3State('training', STAGE_ZH(j.stage) || '训练中…', `${pct}%`);
+  }
+  $('#v3Bar').style.width = pct + '%';
+  pollT = setTimeout(pollJob, 2500);
+}
+
+async function showSplat(blob) {
+  v3State('loading', '正在载入 3D 模型…', '');
+  try {
+    const { SplatViewer } = await import('./gs3d.js');
+    if (!viewer) viewer = new SplatViewer($('#v3Canvas'));
+    const info = await viewer.load(await blob.arrayBuffer());
+    v3State('view', '', `${(info.count / 1000).toFixed(1)}k 个高斯点`);
+  } catch (e) {
+    console.error(e);
+    v3State('error', '3D 模型载入失败', '这台设备可能不支持 WebGL2');
+  }
+}
+
+function save3D() {
+  const h = v3Holder;
+  if (!h || !h.gsBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(h.gsBlob);
+  a.download = `hairmagic-${h.date}-${(h.label || 'look').replace(/[^\w一-龥#-]+/g, '_')}.ply`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
 // ---------------------------------------------------------------- navigation
 function go(view) {
   if (view === 'scan') {
@@ -897,6 +1083,22 @@ function bind() {
     toast('已重新估算发长');
   };
   $$('.seg-btn').forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; renderMode(); renderSummary(); }));
+  $$('.line-btn').forEach((b) => (b.onclick = () => {
+    S.line = b.dataset.line;
+    store.prefs.set('line', S.line);
+    S.styleId = null;
+    renderLine();
+  }));
+  $('#btn3d').onclick = open3D;
+  $('#v3Close').onclick = close3D;
+  $('#v3Reset').onclick = () => viewer && viewer.reset();
+  $('#v3Spin').onclick = () => {
+    const on = $('#v3Spin').getAttribute('aria-pressed') !== 'true';
+    $('#v3Spin').setAttribute('aria-pressed', on);
+    viewer && viewer.setAutoRotate(on);
+  };
+  $('#v3Save').onclick = save3D;
+  $('#v3Train').onclick = () => start3DJob(true);
   $$('.pills').forEach((g) =>
     $$('.pill', g).forEach((p) => (p.onclick = () => {
       S[g.dataset.opt] = p.dataset.v;

@@ -15,7 +15,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./css/app.css?v=1" />
+  <link rel="stylesheet" href="./css/app.css?v=2" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/",
+        "@sparkjsdev/spark": "./vendor/spark/spark.module.js"
+      }
+    }
+  </script>
 </head>
 <body>
   <div class="app" id="app">
@@ -67,6 +76,10 @@
                 <svg viewBox="0 0 24 24"><path d="M12 3v18M5 6h4v12H5zM15 6h4v12h-4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
                 <span>对比</span>
               </button>
+              <button class="icon-btn icon-btn-3d" id="btn3d" type="button" title="3D 高斯泼溅头像" hidden>
+                <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z M12 12l8-4.5M12 12v9M12 12L4 7.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                <span>3D</span>
+              </button>
               <button class="icon-btn" id="btnSave" type="button" title="保存图片" hidden>
                 <svg viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <span>保存</span>
@@ -87,6 +100,11 @@
           <div class="looks" id="looksRow" hidden>
             <div class="row-title"><h2>今天的造型</h2><span id="looksCount"></span></div>
             <div class="looks-rail" id="looksRail"></div>
+          </div>
+
+          <div class="line-toggle" role="group" aria-label="发型类别">
+            <button class="line-btn is-on" data-line="m" type="button" aria-pressed="true">男士发型</button>
+            <button class="line-btn" data-line="f" type="button" aria-pressed="false">女士发型</button>
           </div>
 
           <div class="seg" role="tablist" aria-label="造型来源">
@@ -227,8 +245,39 @@
     <div class="date-list" id="dateList"></div>
   </section>
 
+  <!-- 3D VIEWER -->
+  <div class="viewer3d" id="viewer3d" data-state="intro" hidden>
+    <div class="v3-canvas" id="v3Canvas"></div>
+    <div class="v3-top">
+      <button class="cap-close" id="v3Close" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <div class="v3-title"><strong id="v3Title">3D 发型</strong><span>3D Gaussian Splatting</span></div>
+    </div>
+    <div class="v3-panel">
+      <p class="v3-status" id="v3Status"></p>
+      <p class="v3-sub" id="v3Sub"></p>
+      <div class="v3-progress"><span id="v3Bar"></span></div>
+      <button class="btn btn-sheen v3-train" id="v3Train" type="button">开始训练 3D 头像</button>
+    </div>
+    <div class="v3-tools">
+      <p class="v3-hint">拖动旋转 · 双指缩放 · 双指平移</p>
+      <div class="v3-btns">
+        <button class="icon-btn" id="v3Spin" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.6M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>自动旋转</span>
+        </button>
+        <button class="icon-btn" id="v3Reset" type="button">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>正面</span>
+        </button>
+        <button class="icon-btn" id="v3Save" type="button">
+          <svg viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>.ply</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script type="module" src="./js/app.js?v=1"></script>
+  <script type="module" src="./js/app.js?v=2"></script>
 </body>
 </html>

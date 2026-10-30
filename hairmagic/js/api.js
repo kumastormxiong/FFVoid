@@ -76,3 +76,34 @@ export function errorText(e) {
   if (code === 'origin not allowed') return '请通过 ffvoid.com/hairmagic 访问';
   return 'AI 生成失败（' + (code || '未知错误') + '），请重试';
 }
+
+// ---------------------------------------------------------------- 3DGS jobs
+export async function createGsJob({ views, meta, label }) {
+  const fd = new FormData();
+  views.forEach((b, i) => fd.append('view' + i, b, `view${i}.jpg`));
+  fd.append('meta', JSON.stringify(meta || {}));
+  fd.append('label', label || '');
+  const r = await post('gs/jobs', fd, 60000);
+  return r.json();
+}
+
+export async function gsJob(id) {
+  const r = await fetch(API + 'gs/jobs/' + encodeURIComponent(id), { cache: 'no-store' });
+  if (!r.ok) throw new ApiError(r.status === 404 ? 'job_missing' : 'http_' + r.status);
+  return r.json();
+}
+
+export async function gsResult(id) {
+  const r = await fetch(API + 'gs/jobs/' + encodeURIComponent(id) + '/result');
+  if (!r.ok) throw new ApiError('http_' + r.status);
+  return r.blob();
+}
+
+export async function gsStatus() {
+  try {
+    const r = await fetch(API + 'gs/status', { cache: 'no-store' });
+    return r.ok ? r.json() : { worker_online: false };
+  } catch {
+    return { worker_online: false };
+  }
+}
