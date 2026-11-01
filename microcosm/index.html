@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<script>
+  (function () { var p = location.pathname; if (!/\/$/.test(p) && !/\.[a-z0-9]+$/i.test(p)) location.replace(p + '/' + location.search + location.hash); })();
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>画境坍缩：千界之眸 · Microcosm Canvas</title>
+<meta name="description" content="一款跨尺度无限缩放解谜游戏：走进一幅未点睛的肖像，穿过六个风格迥异的嵌套世界。电脑、手机与 Quest VR 均可游玩。">
+<meta name="theme-color" content="#1a1420">
+<meta property="og:title" content="画境坍缩：千界之眸 · Microcosm Canvas">
+<meta property="og:description" content="走进她的瞳孔。六个嵌套的世界，六种画风，一场首尾相连的缩放之旅。">
+<meta property="og:url" content="https://ffvoid.com/microcosm/">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#1a1420; --paper:#faf3dd; --amber:#d4a373; --cyan:#72efdd; --verm:#d62828; --muted:rgba(250,243,221,.62); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink); color: var(--paper); font-family: "Noto Serif SC", "Cormorant Garamond", serif; -webkit-tap-highlight-color: transparent; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .layer { position: fixed; pointer-events: none; }
+  /* 菜单 */
+  #menu { position: fixed; inset: 0; display: flex; align-items: center; justify-content: flex-start; padding: 0 8vw; background: linear-gradient(90deg, rgba(20,14,24,.92) 0%, rgba(20,14,24,.72) 38%, rgba(20,14,24,0) 72%); transition: opacity 1.2s ease; z-index: 10; }
+  #menu.off { opacity: 0; pointer-events: none; }
+  .mbox { max-width: 520px; }
+  .kicker { font-family: "Cormorant Garamond", serif; letter-spacing: .32em; font-size: 13px; text-transform: uppercase; color: var(--amber); }
+  h1 { font-family: "Ma Shan Zheng", serif; font-weight: 400; font-size: clamp(46px, 8vw, 88px); line-height: 1.05; margin: 14px 0 6px; letter-spacing: .04em; }
+  h1 .sub { display: block; font-size: .46em; opacity: .9; margin-top: 8px; }
+  .en { font-family: "Cormorant Garamond", serif; font-style: italic; font-size: 22px; color: var(--muted); }
+  .lead { line-height: 1.9; color: var(--muted); font-size: 15px; margin: 22px 0 28px; }
+  .btns { display: flex; flex-wrap: wrap; gap: 12px; }
+  button { pointer-events: auto; font: inherit; color: var(--paper); background: transparent; border: 1px solid rgba(250,243,221,.4); padding: 12px 22px; border-radius: 999px; cursor: pointer; font-size: 15px; letter-spacing: .06em; transition: background .25s, border-color .25s, color .25s; }
+  button:hover, button:focus-visible { background: rgba(250,243,221,.1); border-color: var(--paper); outline: none; }
+  button.primary { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+  button.primary:hover { background: #fff; }
+  button.vr { border-color: var(--cyan); color: var(--cyan); }
+  .small { font-size: 13px; padding: 8px 16px; }
+  .controls { margin-top: 30px; font-size: 13px; color: var(--muted); line-height: 1.9; border-top: 1px solid rgba(250,243,221,.15); padding-top: 18px; }
+  .controls b { color: var(--paper); font-weight: 600; }
+  .langbtn { position: fixed; top: 18px; right: 18px; z-index: 11; }
+  /* HUD */
+  #hud { top: 18px; left: 50%; transform: translateX(-50%); font-size: 13px; letter-spacing: .12em; color: var(--muted); opacity: 0; transition: opacity .6s; }
+  body.playing #hud { opacity: 1; }
+  #pigments { top: 16px; left: 18px; display: flex; gap: 8px; opacity: 0; transition: opacity .6s; }
+  body.playing #pigments { opacity: 1; }
+  .pg { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(250,243,221,.35); background: transparent; transition: background .8s, box-shadow .8s; }
+  .pg.on { background: var(--c); border-color: var(--c); box-shadow: 0 0 10px var(--c); }
+  #cross { left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(250,243,221,.7); opacity: 0; transition: transform .15s, background .15s; }
+  body.playing:not(.vrmode) #cross { opacity: 1; }
+  #cross.hot { transform: scale(2.2); background: var(--cyan); }
+  #tip { left: 50%; top: calc(50% + 26px); transform: translateX(-50%); font-size: 14px; color: var(--paper); text-shadow: 0 1px 6px rgba(0,0,0,.8); opacity: 0; transition: opacity .2s; white-space: nowrap; }
+  #subs { left: 50%; bottom: 9vh; transform: translateX(-50%) translateY(10px); max-width: min(880px, 90vw); text-align: center; font-size: clamp(18px, 2.3vw, 26px); line-height: 1.6; padding: 10px 24px; border-radius: 14px; background: rgba(18,14,20,.42); opacity: 0; transition: opacity .5s, transform .5s; }
+  #subs.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #subs.v { font-family: "Ma Shan Zheng", "Noto Serif SC", serif; color: #ffe8c2; font-size: clamp(22px, 2.8vw, 32px); }
+  #subs.h, #subs.s { font-size: clamp(15px, 1.8vw, 19px); color: #ecebf2; }
+  #toast { top: 54px; left: 50%; transform: translate(-50%, -8px); font-size: 15px; padding: 8px 18px; border-radius: 999px; background: rgba(18,14,20,.55); opacity: 0; transition: opacity .5s, transform .5s; display: flex; align-items: center; gap: 10px; }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+  #toast .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 10px currentColor; }
+  #worldTitle { left: 0; right: 0; top: 30%; text-align: center; opacity: 0; }
+  #worldTitle.on { animation: wt 4.6s ease forwards; }
+  #worldTitle .t1 { font-family: "Ma Shan Zheng", serif; font-size: clamp(40px, 6vw, 72px); text-shadow: 0 2px 20px rgba(0,0,0,.5); }
+  #worldTitle .t2 { font-family: "Cormorant Garamond", serif; font-style: italic; font-size: clamp(16px, 2vw, 22px); color: var(--muted); margin-top: 6px; }
+  @keyframes wt { 0% { opacity: 0; transform: translateY(12px); } 18% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
+  #vignette { inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(20,14,24,.95) 100%); opacity: 0; }
+  #pause, #endcard { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(20,14,24,.66); z-index: 9; text-align: center; padding: 16px; }
+  #pause.on, #endcard.on { display: flex; }
+  #pause h2, #endcard h2 { font-family: "Ma Shan Zheng", serif; font-weight: 400; font-size: 44px; margin: 0 0 8px; }
+  #endcard p { color: var(--muted); line-height: 1.9; max-width: 520px; margin: 10px auto 24px; }
+  .credit { font-family: "Cormorant Garamond", serif; letter-spacing: .2em; color: var(--amber); font-size: 14px; margin-top: 22px; }
+  .credit a { color: var(--amber); }
+  #joy { width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 50%; border: 1px solid rgba(250,243,221,.35); background: rgba(250,243,221,.06); display: none; }
+  #joy.on { display: block; }
+  #joyKnob { position: absolute; left: 30px; top: 30px; width: 36px; height: 36px; border-radius: 50%; background: rgba(250,243,221,.45); }
+  #zoomBtns { right: 18px; bottom: 22vh; display: none; flex-direction: column; gap: 10px; }
+  body.touchmode.playing #zoomBtns { display: flex; }
+  #zoomBtns button { width: 54px; height: 54px; padding: 0; font-size: 22px; background: rgba(18,14,20,.4); }
+  #actBtn { right: 18px; bottom: 9vh; display: none; }
+  body.touchmode.playing #actBtn { display: block; }
+  #actBtn button { background: rgba(250,243,221,.18); }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--ink); z-index: 20; font-family: "Ma Shan Zheng", serif; font-size: 28px; transition: opacity .8s; }
+  #loading.off { opacity: 0; pointer-events: none; }
+  @media (max-width: 720px) {
+    #menu { padding: 0 16px; align-items: flex-end; padding-bottom: 6vh; background: linear-gradient(0deg, rgba(20,14,24,.95) 0%, rgba(20,14,24,.8) 55%, rgba(20,14,24,0) 100%); }
+    .lead { font-size: 14px; margin: 14px 0 18px; }
+    .controls { display: none; }
+    #pigments { top: 50px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #worldTitle.on { animation-duration: 3s; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">画境 · Microcosm</div>
+
+<div id="menu">
+  <div class="mbox">
+    <div class="kicker">FFVoid · 虚空造物 presents</div>
+    <h1 data-zh="画境坍缩<span class='sub'>千界之眸</span>" data-en="Microcosm<span class='sub'>Canvas</span>">画境坍缩<span class="sub">千界之眸</span></h1>
+    <div class="en" data-zh="Microcosm Canvas · The Eye of Myriad Worlds" data-en="画境坍缩 · 千界之眸">Microcosm Canvas · The Eye of Myriad Worlds</div>
+    <p class="lead" data-zh="失明的老画师离开了人世，只留下一幅没有画眼睛的肖像，和一副双环透镜。<br>走进她的瞳孔——六个嵌套的世界，六种画风，一场首尾相连的缩放之旅。" data-en="A blind old painter has passed away, leaving a portrait without eyes and a twin-ring lens.<br>Step into her pupil — six nested worlds, six painting styles, one zoom that loops back on itself.">失明的老画师离开了人世，只留下一幅没有画眼睛的肖像，和一副双环透镜。<br>走进她的瞳孔——六个嵌套的世界，六种画风，一场首尾相连的缩放之旅。</p>
+    <div class="btns">
+      <button class="primary" id="btnStart" data-zh="开始" data-en="Begin">开始</button>
+      <button id="btnContinue" style="display:none" data-zh="继续上次" data-en="Continue">继续上次</button>
+      <button class="vr" id="btnVR" style="display:none" data-zh="进入 VR" data-en="Enter VR">进入 VR</button>
+      <button class="vr small" id="btnVRc" style="display:none" data-zh="VR 继续" data-en="VR continue">VR 继续</button>
+    </div>
+    <div class="controls" data-zh="<b>电脑</b>　鼠标看 · WASD 走 · 单击/E 握住或触碰 · <b>滚轮</b>（或 Z/X）缩放 · Shift 精细<br><b>Quest</b>　扳机握住 · <b>双手侧握拉开/合拢</b>缩放（或右摇杆上下）· 左摇杆移动 · 右摇杆左右转身<br><b>手机</b>　右侧拖动看 · 左下摇杆走 · 轻点握住 · 双指缩放" data-en="<b>PC</b>  mouse look · WASD walk · click/E grab or touch · <b>wheel</b> (or Z/X) zoom · Shift fine<br><b>Quest</b>  trigger grab · <b>hold both grips, pull apart / together</b> to zoom (or right stick) · left stick move · right stick turn<br><b>Phone</b>  drag right side to look · left joystick walk · tap to grab · pinch to zoom"></div>
+  </div>
+</div>
+<button class="langbtn small" id="btnLang" data-zh="EN" data-en="中文">EN</button>
+
+<div class="layer" id="hud"></div>
+<div class="layer" id="pigments"></div>
+<div class="layer" id="cross"></div>
+<div class="layer" id="tip"></div>
+<div class="layer" id="subs"></div>
+<div class="layer" id="toast"></div>
+<div class="layer" id="worldTitle"></div>
+<div class="layer" id="vignette"></div>
+<div class="layer" id="joy"><div id="joyKnob"></div></div>
+<div class="layer" id="zoomBtns"><button id="zIn" aria-label="zoom in">＋</button><button id="zOut" aria-label="zoom out">－</button></div>
+<div class="layer" id="actBtn"><button id="btnAct" data-zh="握住 / 松开" data-en="Grab / Release">握住 / 松开</button></div>
+
+<div id="pause">
+  <div>
+    <h2 data-zh="暂停" data-en="Paused">暂停</h2>
+    <div class="btns" style="justify-content:center">
+      <button class="primary" id="btnResume" data-zh="继续" data-en="Resume">继续</button>
+      <button id="btnRestart" data-zh="从头开始" data-en="Restart">从头开始</button>
+    </div>
+  </div>
+</div>
+<div id="endcard">
+  <div>
+    <h2 data-zh="看见，就是完成。" data-en="To see is to finish.">看见，就是完成。</h2>
+    <p data-zh="六种颜色都回到了画里。<br>六界首尾相连——现在你可以一直潜下去，从她的瞳孔，回到她的瞳孔。" data-en="All six colours are back in the painting.<br>The six worlds are joined end to end — dive forever, from her pupil back to her pupil.">六种颜色都回到了画里。<br>六界首尾相连——现在你可以一直潜下去，从她的瞳孔，回到她的瞳孔。</p>
+    <div class="btns" style="justify-content:center">
+      <button class="primary" id="btnRoam" data-zh="继续漫游" data-en="Keep wandering">继续漫游</button>
+      <button id="btnRestart2" onclick="try{localStorage.removeItem('microcosm-canvas-v1')}catch(e){};location.reload()" data-zh="重新开始" data-en="Play again">重新开始</button>
+    </div>
+    <div class="credit">画境坍缩：千界之眸 · MICROCOSM CANVAS<br>FFVoid · 虚空造物 · <a href="https://ffvoid.com" style="pointer-events:auto">ffvoid.com</a></div>
+  </div>
+</div>
+
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<script type="module">
+  import('./js/main.js').then(() => {
+    const go = () => document.getElementById('loading').classList.add('off');
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(go); setTimeout(go, 2500);
+  }).catch((e) => { document.getElementById('loading').textContent = '加载失败 · ' + e.message; console.error(e); });
+</script>
+</body>
+</html>

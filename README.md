@@ -45,3 +45,7 @@ Hosted on Cloudflare Pages. Headers are in `_headers`.
 ## /cube
 
 `cube/` hosts the mini game 醒醒吧！方块 (Wake Up, Cubes!) at [ffvoid.com/cube](https://ffvoid.com/cube/). Source of truth: [WakeupCubes-VR](https://github.com/kumastormxiong/WakeupCubes-VR).
+
+## /microcosm
+
+`microcosm/` hosts 画境坍缩：千界之眸 (Microcosm Canvas), a cross-scale infinite-zoom puzzle game playable on desktop, phone and Quest (WebXR) at [ffvoid.com/microcosm](https://ffvoid.com/microcosm/). Static files, three.js r160, no build step. Design notes: `microcosm/DESIGN.md`.

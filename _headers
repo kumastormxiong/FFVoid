@@ -10,6 +10,9 @@
 /cube/*
   Cache-Control: no-cache
 
+/microcosm/*
+  Cache-Control: no-cache
+
 # HairMagic needs the front camera: lift the site-wide camera block for /hairmagic only
 /hairmagic
   ! Permissions-Policy
