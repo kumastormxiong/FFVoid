@@ -1,5 +1,5 @@
 // Hair-length model: current length (cm) per zone, what each style needs, and growth time.
-import { hairMask } from './vision.js?v=202611040752';
+import { hairMask } from './vision.js?v=202611040802';
 
 export const GROWTH_CM_PER_MONTH = 1.25; // average scalp hair growth
 

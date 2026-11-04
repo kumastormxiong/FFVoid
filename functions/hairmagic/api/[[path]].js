@@ -116,7 +116,9 @@ async function generate(request, env) {
   let image, ref;
   try {
     image = await readImage(form, 'image');
-    ref = await readImage(form, 'ref');
+    // The front-result reference is ignored: it pulls every angle toward the front pose.
+    // Each angle is generated from its own photo, so the head angle always matches that photo.
+    ref = null;
   } catch (e) {
     return json({ error: e.message }, 400);
   }
