@@ -9,6 +9,8 @@ const MODELS = {
 };
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const ALLOWED_HOSTS = /(^|\.)ffvoid\.com$|\.pages\.dev$|^localhost$|^127\.0\.0\.1$/;
+// Backup when the Cloudflare neuron quota is used up: same FLUX.2 klein 4B model on Pollinations.
+const POLLI_MODEL = 'black-forest-labs/flux.2-klein-4b';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), {
@@ -73,6 +75,34 @@ function originOk(request) {
   }
 }
 
+// Pollinations image edit (OpenAI-style multipart, image[] = source + optional side reference).
+// Returns JPEG/PNG bytes, or null when the backup is unavailable.
+async function pollinationsEdit(env, prompt, image, ref, width, height) {
+  if (!env.POLLINATIONS_KEY) return null;
+  const fd = new FormData();
+  fd.append('model', POLLI_MODEL);
+  fd.append('prompt', prompt);
+  fd.append('size', `${width - (width % 16)}x${height - (height % 16)}`);
+  fd.append('n', '1');
+  fd.append('response_format', 'b64_json');
+  fd.append('image[]', image, 'image0');
+  if (ref) fd.append('image[]', ref, 'image1');
+  try {
+    const r = await fetch('https://gen.pollinations.ai/v1/images/edits', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + env.POLLINATIONS_KEY },
+      body: fd,
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const b64 = j && j.data && j.data[0] && j.data[0].b64_json;
+    if (!b64) return null;
+    return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  } catch {
+    return null;
+  }
+}
+
 async function generate(request, env) {
   if (!env.AI) return json({ error: 'AI binding missing on this deployment' }, 503);
 
@@ -118,6 +148,21 @@ async function generate(request, env) {
   } catch (e) {
     const msg = String((e && e.message) || e);
     const quota = /neuron|quota|limit|429|exceed/i.test(msg);
+    if (quota) {
+      // Cloudflare daily quota used up: fall back to Pollinations so the user still gets a result.
+      const fb = await pollinationsEdit(env, buildPrompt(hair, color, !!ref), image, ref, width, height);
+      if (fb) {
+        return new Response(fb, {
+          headers: {
+            'content-type': sniffImage(fb.buffer) || 'image/jpeg',
+            'cache-control': 'no-store',
+            'x-hm-model': 'pollinations',
+            'x-hm-ms': String(Date.now() - t0),
+            'x-hm-seed': String(seed),
+          },
+        });
+      }
+    }
     return json({ error: quota ? 'quota' : 'model_error', detail: msg.slice(0, 300) }, quota ? 429 : 502);
   }
   if (!out || !out.image) return json({ error: 'empty result' }, 502);
@@ -392,7 +437,7 @@ export async function onRequest(context) {
     } catch {}
     return json({ ok: true });
   }
-  if (route === 'health') return json({ ok: true, ai: !!env.AI, db: !!env.DB, worker_auth: !!env.HM_WORKER_TOKEN, models: Object.keys(MODELS) });
+  if (route === 'health') return json({ ok: true, ai: !!env.AI, db: !!env.DB, worker_auth: !!env.HM_WORKER_TOKEN, backup: !!env.POLLINATIONS_KEY, models: Object.keys(MODELS) });
   if (route === 'analyze') {
     if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
     return analyze(request, env);
