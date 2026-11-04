@@ -150,7 +150,9 @@ async function generate(request, env) {
     const quota = /neuron|quota|limit|429|exceed/i.test(msg);
     if (quota) {
       // Cloudflare daily quota used up: fall back to Pollinations so the user still gets a result.
-      const fb = await pollinationsEdit(env, buildPrompt(hair, color, !!ref), image, ref, width, height);
+      // Backup sends only the source photo: a second (side) reference image pulls the head angle
+      // toward that reference on Pollinations, while Cloudflare keeps the angle. Hair comes from the text.
+      const fb = await pollinationsEdit(env, buildPrompt(hair, color, false), image, null, width, height);
       if (fb) {
         return new Response(fb, {
           headers: {
