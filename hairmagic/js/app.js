@@ -1,16 +1,16 @@
 // HairMagic — app shell: state, studio, capture flow, archive.
-import * as store from './store.js?v=202610301254';
-import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace } from './styles.js?v=202610301254';
+import * as store from './store.js?v=202611040619';
+import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace } from './styles.js?v=202611040619';
 import {
   NEEDS, LENGTH_PRESETS, SEED_LENGTH_NEEDS, GROWTH_CM_PER_MONTH,
   monthsNeeded, gapDetail, describeLength, geometricEstimate,
-} from './length.js?v=202610301254';
-import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202610301254';
-import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202610301254';
-import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js?v=202610301254';
+} from './length.js?v=202611040619';
+import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611040619';
+import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611040619';
+import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js?v=202611040619';
 import {
   GuidedCapture, STEPS, ANGLE_ZH, ANGLE_ORDER, cropHead, compactLandmarks, classifyAngle, fileToCanvas,
-} from './capture.js?v=202610301254';
+} from './capture.js?v=202611040619';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -373,7 +373,7 @@ function renderStyles() {
     };
     grid.appendChild(b);
   }
-  if (!list.length) grid.innerHTML = '<p class="mode-note">没有匹配的发型，试试“全部 20 款”。</p>';
+  if (!list.length) grid.innerHTML = '<p class="mode-note">没有匹配的发型，试试“全部 50 款”。</p>';
 }
 
 function allowedSeedLengths() {
@@ -1020,7 +1020,7 @@ async function pollJob() {
 async function showSplat(blob) {
   v3State('loading', '正在载入 3D 模型…', '');
   try {
-    const { SplatViewer } = await import('./gs3d.js?v=202610301254');
+    const { SplatViewer } = await import('./gs3d.js?v=202611040619');
     if (!viewer) viewer = new SplatViewer($('#v3Canvas'));
     const info = await viewer.load(await blob.arrayBuffer());
     v3State('view', '', `${(info.count / 1000).toFixed(1)}k 个高斯点`);

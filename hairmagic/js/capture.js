@@ -1,6 +1,6 @@
 // Guided head scan: live face mesh, pose targets with auto-shutter, and gallery import.
-import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, FACE_OVAL as OVAL } from './vision.js?v=202610301254';
-import { canvasOf, canvasToBlob } from './composite.js?v=202610301254';
+import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, FACE_OVAL as OVAL } from './vision.js?v=202611040619';
+import { canvasOf, canvasToBlob } from './composite.js?v=202611040619';
 
 export const OUT_W = 768;
 export const OUT_H = 1024;
