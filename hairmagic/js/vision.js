@@ -16,6 +16,9 @@ let videoLM = null;
 let imageLM = null;
 let hairSeg = null;
 let loading = null;
+let forceCPU = false;
+let lastDelegate = '';
+export const visionDelegate = () => lastDelegate;
 
 async function makeLandmarker(mode, delegate) {
   const { FaceLandmarker } = await mp();
@@ -29,12 +32,30 @@ async function makeLandmarker(mode, delegate) {
 }
 
 async function withFallback(make) {
-  try {
-    return await make('GPU');
-  } catch (e) {
-    console.warn('GPU delegate failed, using CPU', e);
-    return make('CPU');
+  if (!forceCPU) {
+    try {
+      const r = await make('GPU');
+      lastDelegate = 'GPU';
+      return r;
+    } catch (e) {
+      console.warn('GPU delegate failed, using CPU', e);
+    }
   }
+  lastDelegate = 'CPU';
+  return make('CPU');
+}
+
+/** Some phones create the GPU delegate fine but then never find a face: rebuild everything on CPU. */
+export async function switchToCpu() {
+  if (forceCPU) return false;
+  forceCPU = true;
+  try { if (videoLM) videoLM.close(); } catch {}
+  try { if (imageLM) imageLM.close(); } catch {}
+  videoLM = null;
+  imageLM = null;
+  loading = null;
+  await loadVision();
+  return true;
 }
 
 /** Load the landmark models once. */

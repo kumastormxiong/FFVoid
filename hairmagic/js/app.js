@@ -1,16 +1,16 @@
 // HairMagic — app shell: state, studio, capture flow, archive.
-import * as store from './store.js?v=202611101847';
-import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace } from './styles.js?v=202611101847';
+import * as store from './store.js?v=202611101917';
+import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace } from './styles.js?v=202611101917';
 import {
   NEEDS, LENGTH_PRESETS, SEED_LENGTH_NEEDS, GROWTH_CM_PER_MONTH,
   monthsNeeded, gapDetail, describeLength, geometricEstimate,
-} from './length.js?v=202611101847';
-import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611101847';
-import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611101847';
-import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js?v=202611101847';
+} from './length.js?v=202611101917';
+import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611101917';
+import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611101917';
+import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js?v=202611101917';
 import {
   GuidedCapture, STEPS, ANGLE_ZH, ANGLE_ORDER, cropHead, compactLandmarks, planAngles, fileToCanvas,
-} from './capture.js?v=202611101847';
+} from './capture.js?v=202611101917';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1023,7 +1023,7 @@ async function pollJob() {
 async function showSplat(blob) {
   v3State('loading', '正在载入 3D 模型…', '');
   try {
-    const { SplatViewer } = await import('./gs3d.js?v=202611101847');
+    const { SplatViewer } = await import('./gs3d.js?v=202611101917');
     if (!viewer) viewer = new SplatViewer($('#v3Canvas'));
     const info = await viewer.load(await blob.arrayBuffer());
     v3State('view', '', `${(info.count / 1000).toFixed(1)}k 个高斯点`);

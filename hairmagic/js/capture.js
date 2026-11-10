@@ -1,6 +1,8 @@
 // Guided head scan: live face mesh, pose targets with auto-shutter, and gallery import.
-import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, FACE_OVAL as OVAL } from './vision.js?v=202611101847';
-import { canvasOf, canvasToBlob } from './composite.js?v=202611101847';
+import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, switchToCpu, visionDelegate, FACE_OVAL as OVAL } from './vision.js?v=202611101917';
+import { canvasOf, canvasToBlob } from './composite.js?v=202611101917';
+
+const DEBUG = /[?&]debug=1/.test(location.search);
 
 export const OUT_W = 768;
 export const OUT_H = 1024;
@@ -89,15 +91,19 @@ export function poseHint(key, p, base = 0) {
   return '保持住…';
 }
 
-/** Is the whole head comfortably inside the camera frame (not too close, not cut off)? */
-export function frameFit(face, vw, vh) {
+/**
+ * Is the whole head comfortably inside what the person can see (not too close, not cut off)?
+ * `vis` is the part of the video frame visible on screen ({x0,y0,x1,y1} in video px); the preview
+ * fills the screen, so on tall phones the sides of the frame are not shown.
+ */
+export function frameFit(face, vw, vh, vis = { x0: 0, y0: 0, x1: vw, y1: vh }) {
   const b = face.box;
-  const hr = b.h / vh;
-  if (hr > 0.46) return 'near';
-  if (hr < 0.2) return 'far';
-  const m = 0.03;
-  if (b.x < vw * m || b.x + b.w > vw * (1 - m) || b.y + b.h > vh * (1 - m)) return 'edge';
-  if (b.y < b.h * 0.5) return 'top'; // keep room above the forehead for the hair
+  const hr = b.h / (vis.y1 - vis.y0);
+  if (hr > 0.5) return 'near';
+  if (hr < 0.12) return 'far';
+  const mx = (vis.x1 - vis.x0) * 0.02, my = (vis.y1 - vis.y0) * 0.02;
+  if (b.x < vis.x0 + mx || b.x + b.w > vis.x1 - mx || b.y + b.h > vis.y1 - my) return 'edge';
+  if (b.y < vis.y0 + b.h * 0.25) return 'top'; // keep a little room above the forehead for the hair
   return 'ok';
 }
 
@@ -214,6 +220,9 @@ export class GuidedCapture {
     v.muted = true;
     await v.play();
     this.lm = await getVideoLandmarker();
+    this.startedAt = performance.now();
+    this.seenFace = false;
+    this.errs = 0;
     this.running = true;
     this.loop();
   }
@@ -224,7 +233,8 @@ export class GuidedCapture {
     if (!track || !track.getCapabilities) return;
     try {
       const caps = track.getCapabilities();
-      if (caps.zoom && typeof caps.zoom.min === 'number') await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+      const cur = track.getSettings && track.getSettings().zoom;
+      if (caps.zoom && typeof cur === 'number' && cur > 1) await track.applyConstraints({ advanced: [{ zoom: Math.max(1, caps.zoom.min || 1) }] });
     } catch (e) {
       console.warn('zoom-out failed', e);
     }
@@ -240,7 +250,7 @@ export class GuidedCapture {
     if (!this.running) return;
     requestAnimationFrame(this.loop);
     const v = this.ui.video;
-    if (v.readyState < 2) return;
+    if (v.readyState < 2 || this.swapping) return;
     const now = performance.now();
     if (now - this.lastT < 66) return; // ~15 fps analysis
     const dt = Math.min(200, now - this.lastT);
@@ -249,17 +259,22 @@ export class GuidedCapture {
     try {
       res = this.lm.detectForVideo(v, now);
     } catch {
+      this.errs++;
+      this.maybeCpu(now);
       return;
     }
     const face = res.faceLandmarks && res.faceLandmarks.length ? packFace(res, v.videoWidth, v.videoHeight) : null;
     this.lastFace = face;
+    if (face) this.seenFace = true;
+    else this.maybeCpu(now);
     const step = this.current;
     let score = 0;
     if (face && step) {
       const p = headPose(face);
       score = stepScore(step.key, p, this.baseline);
-      const fit = frameFit(face, v.videoWidth, v.videoHeight);
+      const fit = frameFit(face, v.videoWidth, v.videoHeight, this.visibleRect());
       if (fit !== 'ok') score = Math.min(score, 0.5);
+      this.dbg = { fit, yaw: p.yaw, pitch: p.pitch, score };
       this.ui.onStatus && this.ui.onStatus({ face: true, fit, score, step, pose: p, hint: poseHint(step.key, p, this.baseline) });
       if (score >= 0.98 && !this.busy) {
         this.hold += dt;
@@ -271,6 +286,47 @@ export class GuidedCapture {
     }
     this.drawHud(face, score, this.hold / 650);
   };
+
+  /** Part of the video frame that is visible on screen (preview uses object-fit: cover), in video px. */
+  visibleRect() {
+    const v = this.ui.video, c = this.ui.hud;
+    const cw = c.clientWidth || 1, ch = c.clientHeight || 1;
+    const sc = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+    const gx = (v.videoWidth - cw / sc) / 2, gy = (v.videoHeight - ch / sc) / 2;
+    return { x0: gx, y0: gy, x1: v.videoWidth - gx, y1: v.videoHeight - gy };
+  }
+
+  /** No face for 3 s (or detector errors) on the GPU delegate: some phones need the CPU one. */
+  maybeCpu(now) {
+    if (this.swapping || this.seenFace && !this.errs) return;
+    if (this.cpuTried || now - this.startedAt < 3000) return;
+    this.cpuTried = true;
+    this.swapping = true;
+    (async () => {
+      try {
+        if (await switchToCpu()) this.lm = await getVideoLandmarker();
+      } catch (e) {
+        console.warn('cpu fallback failed', e);
+      } finally {
+        this.startedAt = performance.now();
+        this.errs = 0;
+        this.swapping = false;
+      }
+    })();
+  }
+
+  /** Small status line for field debugging: open the page with ?debug=1. */
+  drawDebug(g, cw, ch, face) {
+    const v = this.ui.video;
+    const d = this.dbg || {};
+    const t = `${v.videoWidth}x${v.videoHeight} ${visionDelegate()}${this.cpuTried ? '*' : ''} face:${face ? 1 : 0} errs:${this.errs || 0}` +
+      (face ? ` fit:${d.fit} yaw:${(d.yaw || 0).toFixed(0)} pit:${(d.pitch || 0).toFixed(0)} sc:${(d.score || 0).toFixed(2)}` : '');
+    g.font = '11px monospace';
+    g.fillStyle = 'rgba(0,0,0,.55)';
+    g.fillRect(6, ch * 0.5 - 12, g.measureText(t).width + 8, 16);
+    g.fillStyle = '#7CFC9A';
+    g.fillText(t, 10, ch * 0.5);
+  }
 
   drawHud(face, score, hold) {
     const c = this.ui.hud;
@@ -313,8 +369,9 @@ export class GuidedCapture {
       }
       g.restore();
     }
+    if (DEBUG) this.drawDebug(g, cw, ch, face);
     if (!face) return;
-    const s = Math.min(cw / v.videoWidth, ch / v.videoHeight); // whole frame visible (object-fit: contain)
+    const s = Math.max(cw / v.videoWidth, ch / v.videoHeight); // full-screen fill (object-fit: cover)
     const ox = (cw - v.videoWidth * s) / 2, oy = (ch - v.videoHeight * s) / 2;
     const X = (p) => ox + p.x * s; // same raw frame as the saved photo
     const Y = (p) => oy + p.y * s;
