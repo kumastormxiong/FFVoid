@@ -304,7 +304,11 @@ svg circle:not([fill]) { fill: currentColor; }
 /* ---------- capture ---------- */
 .capture { position: fixed; inset: 0; z-index: 100; background: #07090c; color: #fff; overflow: hidden; }
 .capture video, .capture canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.capture video { object-fit: cover; background: #000; } /* full-screen fill, un-mirrored: same frame as the saved photo */
+.capture video { opacity: 0; pointer-events: none; } /* camera source only; the preview is the #camView canvas */
+.cap-mirror { margin-left: auto; flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,.16); color: #fff; font-size: 12px; font-weight: 600; }
+.cap-mirror[aria-pressed="true"] { background: #fff; color: var(--ink); }
+.retake { display: block; margin: 10px auto 0; padding: 7px 14px; border-radius: 999px; font-size: 12.5px; color: var(--ink-2); background: rgba(20,22,27,.06); }
+.retake:active { background: rgba(20,22,27,.12); }
 .cap-top { position: absolute; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top, 0px) + 12px) var(--gutter) 30px; display: flex; gap: 12px; align-items: flex-start; background: linear-gradient(rgba(0,0,0,.55), transparent); }
 .cap-close { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.14); display: grid; place-items: center; flex: none; color: #fff; }
 .cap-close svg { width: 20px; height: 20px; }

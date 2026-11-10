@@ -1,16 +1,16 @@
 // HairMagic — app shell: state, studio, capture flow, archive.
-import * as store from './store.js?v=202611101917';
-import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace } from './styles.js?v=202611101917';
+import * as store from './store.js?v=202611101949';
+import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace } from './styles.js?v=202611101949';
 import {
   NEEDS, LENGTH_PRESETS, SEED_LENGTH_NEEDS, GROWTH_CM_PER_MONTH,
   monthsNeeded, gapDetail, describeLength, geometricEstimate,
-} from './length.js?v=202611101917';
-import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611101917';
-import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611101917';
-import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js?v=202611101917';
+} from './length.js?v=202611101949';
+import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611101949';
+import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611101949';
+import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js?v=202611101949';
 import {
   GuidedCapture, STEPS, ANGLE_ZH, ANGLE_ORDER, cropHead, compactLandmarks, planAngles, fileToCanvas,
-} from './capture.js?v=202611101917';
+} from './capture.js?v=202611101949';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -208,6 +208,7 @@ function renderAngles() {
     b.onclick = () => selectPhoto(p.id);
     box.appendChild(b);
   }
+  $('#btnRetake').hidden = !(S.date === store.today() && S.photos.length);
   if (S.photos.length < 5) {
     const add = document.createElement('button');
     add.className = 'angle angle-add';
@@ -645,7 +646,7 @@ function bindStage() {
 
 // ---------------------------------------------------------------- capture overlay
 let cap = null;
-async function openCapture() {
+async function openCapture(retake = false) {
   const ov = $('#capture');
   ov.hidden = false;
   document.body.style.overflow = 'hidden';
@@ -669,9 +670,13 @@ async function openCapture() {
       if (cap && STEPS.every((s) => cap.done.has(s.key))) setTimeout(closeCapture, 700);
     },
   });
-  existing.forEach((a) => cap.done.add(a));
-  const front = S.photos.find((p) => p.angle === 'front');
-  if (front && typeof front.pitch === 'number') cap.baseline = Math.max(-12, Math.min(12, front.pitch));
+  cap.retake = retake; // retake: nothing counts as done, every angle is shot again and replaces the old photo
+  if (!retake) {
+    existing.forEach((a) => cap.done.add(a));
+    const front = S.photos.find((p) => p.angle === 'front');
+    if (front && typeof front.pitch === 'number') cap.baseline = Math.max(-12, Math.min(12, front.pitch));
+  }
+  setupMirrorButton();
   renderCapSteps();
   try {
     await cap.start();
@@ -717,15 +722,43 @@ function renderCapSteps() {
   ol.innerHTML = '';
   const cur = cap && cap.current;
   for (const s of STEPS) {
-    const p = S.photos.find((x) => x.angle === s.key && x.date === store.today());
+    let p = S.photos.find((x) => x.angle === s.key && x.date === store.today());
+    if (p && cap && cap.retake && !cap.done.has(s.key)) p = null; // old photo, not retaken yet
     const li = document.createElement('li');
     li.className = 'cap-step' + (p ? ' is-done' : '') + (cur && cur.key === s.key ? ' is-current' : '');
     li.innerHTML = `<div class="thumb">${p ? `<img alt="" src="${urlFor(p)}">` : ''}</div>${s.zh}${s.key === 'up' || s.key === 'down' ? '<span class="opt-tag">可选</span>' : ''}`;
     ol.appendChild(li);
   }
-  const n = S.photos.filter((p) => p.date === store.today()).length;
-  $('#capDone').disabled = n < 3;
-  $('#capDone').textContent = n < 3 ? `${n}/3` : '完成';
+  const n = cap && cap.retake ? cap.done.size : S.photos.filter((p) => p.date === store.today()).length;
+  const need = cap && cap.retake ? 1 : 3;
+  $('#capDone').disabled = n < need;
+  $('#capDone').textContent = n < need ? `${n}/${need}` : '完成';
+}
+
+function setupMirrorButton() {
+  let b = $('#capMirror');
+  if (!b) {
+    b = document.createElement('button');
+    b.id = 'capMirror';
+    b.type = 'button';
+    b.className = 'cap-mirror';
+    $('.cap-top').appendChild(b);
+  }
+  const sync = () => {
+    b.textContent = cap && cap.mirror ? '镜像 开' : '镜像 关';
+    b.setAttribute('aria-pressed', cap && cap.mirror ? 'true' : 'false');
+  };
+  b.onclick = () => {
+    if (!cap) return;
+    cap.setMirror(!cap.mirror);
+    sync();
+  };
+  sync();
+}
+
+function retakeToday() {
+  if (!confirm('重拍会用新照片替换今天的原始照片，用被替换照片生成的造型也会一并清除。继续吗？')) return;
+  openCapture(true);
 }
 
 function closeCapture() {
@@ -1023,7 +1056,7 @@ async function pollJob() {
 async function showSplat(blob) {
   v3State('loading', '正在载入 3D 模型…', '');
   try {
-    const { SplatViewer } = await import('./gs3d.js?v=202611101917');
+    const { SplatViewer } = await import('./gs3d.js?v=202611101949');
     if (!viewer) viewer = new SplatViewer($('#v3Canvas'));
     const info = await viewer.load(await blob.arrayBuffer());
     v3State('view', '', `${(info.count / 1000).toFixed(1)}k 个高斯点`);
@@ -1063,6 +1096,7 @@ function go(view) {
 function bind() {
   $$('.tab[data-go]').forEach((t) => (t.onclick = () => go(t.dataset.go)));
   $('#startScan').onclick = () => openCapture();
+  $('#btnRetake').onclick = retakeToday;
   $('#pickFiles').onchange = (e) => importFiles(e.target.files, false).finally(() => (e.target.value = ''));
   $('#capFiles').onchange = (e) => importFiles(e.target.files, true).finally(() => (e.target.value = ''));
   $('#capClose').onclick = closeCapture;

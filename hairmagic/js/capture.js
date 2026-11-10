@@ -1,8 +1,21 @@
 // Guided head scan: live face mesh, pose targets with auto-shutter, and gallery import.
-import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, switchToCpu, visionDelegate, FACE_OVAL as OVAL } from './vision.js?v=202611101917';
-import { canvasOf, canvasToBlob } from './composite.js?v=202611101917';
+import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, switchToCpu, visionDelegate, FACE_OVAL as OVAL } from './vision.js?v=202611101949';
+import { canvasOf, canvasToBlob } from './composite.js?v=202611101949';
 
 const DEBUG = /[?&]debug=1/.test(location.search);
+
+// Preview mirroring. Browsers disagree: some mirror the front camera themselves, some do not, and
+// the pixels MediaPipe sees can differ from what a <video> shows. So the preview is drawn on a canvas
+// from the very same frame that is analysed and saved; this switch only decides whether that frame
+// is flipped (selfie-mirror) or kept as the camera delivers it.
+const MIRROR_KEY = 'hm.mirror';
+function readMirror() {
+  try {
+    const v = localStorage.getItem(MIRROR_KEY);
+    if (v != null) return v === '1';
+  } catch {}
+  return !/MicroMessenger/i.test(navigator.userAgent); // best guess; the on-screen switch overrides it
+}
 
 export const OUT_W = 768;
 export const OUT_H = 1024;
@@ -190,6 +203,15 @@ export class GuidedCapture {
     this.lastT = 0;
     this.lastFace = null;
     this.busy = false;
+    this.mirror = readMirror();
+    this.frame = document.createElement('canvas'); // the analysed frame (mirrored like the preview)
+    this.view = null;
+  }
+
+  setMirror(on) {
+    this.mirror = !!on;
+    this.hold = 0;
+    try { localStorage.setItem(MIRROR_KEY, this.mirror ? '1' : '0'); } catch {}
   }
 
   get current() {
@@ -219,6 +241,11 @@ export class GuidedCapture {
     v.setAttribute('playsinline', '');
     v.muted = true;
     await v.play();
+    if (!this.view) {
+      this.view = document.createElement('canvas');
+      this.view.id = 'camView';
+      v.insertAdjacentElement('afterend', this.view);
+    }
     this.lm = await getVideoLandmarker();
     this.startedAt = performance.now();
     this.seenFace = false;
@@ -242,6 +269,7 @@ export class GuidedCapture {
 
   stop() {
     this.running = false;
+    if (this.view) { this.view.remove(); this.view = null; }
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
     this.stream = null;
   }
@@ -250,20 +278,23 @@ export class GuidedCapture {
     if (!this.running) return;
     requestAnimationFrame(this.loop);
     const v = this.ui.video;
-    if (v.readyState < 2 || this.swapping) return;
+    if (v.readyState < 2 || !v.videoWidth) return;
+    this.drawView();
+    if (this.swapping) return;
     const now = performance.now();
     if (now - this.lastT < 66) return; // ~15 fps analysis
     const dt = Math.min(200, now - this.lastT);
     this.lastT = now;
     let res;
+    const fr = this.grabFrame();
     try {
-      res = this.lm.detectForVideo(v, now);
+      res = this.lm.detectForVideo(fr, now);
     } catch {
       this.errs++;
       this.maybeCpu(now);
       return;
     }
-    const face = res.faceLandmarks && res.faceLandmarks.length ? packFace(res, v.videoWidth, v.videoHeight) : null;
+    const face = res.faceLandmarks && res.faceLandmarks.length ? packFace(res, fr.width, fr.height) : null;
     this.lastFace = face;
     if (face) this.seenFace = true;
     else this.maybeCpu(now);
@@ -272,7 +303,7 @@ export class GuidedCapture {
     if (face && step) {
       const p = headPose(face);
       score = stepScore(step.key, p, this.baseline);
-      const fit = frameFit(face, v.videoWidth, v.videoHeight, this.visibleRect());
+      const fit = frameFit(face, fr.width, fr.height, this.visibleRect());
       if (fit !== 'ok') score = Math.min(score, 0.5);
       this.dbg = { fit, yaw: p.yaw, pitch: p.pitch, score };
       this.ui.onStatus && this.ui.onStatus({ face: true, fit, score, step, pose: p, hint: poseHint(step.key, p, this.baseline) });
@@ -287,13 +318,42 @@ export class GuidedCapture {
     this.drawHud(face, score, this.hold / 650);
   };
 
-  /** Part of the video frame that is visible on screen (preview uses object-fit: cover), in video px. */
-  visibleRect() {
-    const v = this.ui.video, c = this.ui.hud;
-    const cw = c.clientWidth || 1, ch = c.clientHeight || 1;
+  /** Paint the live preview (full-screen cover fit) from the video, flipped if mirroring is on. */
+  drawView() {
+    const v = this.ui.video, c = this.view;
+    if (!c) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cw = Math.round(c.clientWidth * dpr), ch = Math.round(c.clientHeight * dpr);
+    if (!cw || !ch) return;
+    if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
+    const g = c.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
     const sc = Math.max(cw / v.videoWidth, ch / v.videoHeight);
-    const gx = (v.videoWidth - cw / sc) / 2, gy = (v.videoHeight - ch / sc) / 2;
-    return { x0: gx, y0: gy, x1: v.videoWidth - gx, y1: v.videoHeight - gy };
+    const dw = v.videoWidth * sc, dh = v.videoHeight * sc;
+    if (this.mirror) { g.translate(cw, 0); g.scale(-1, 1); }
+    g.drawImage(v, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+  }
+
+  /** Downscaled copy of the current frame for face analysis (same flip as the preview). */
+  grabFrame() {
+    const v = this.ui.video, f = this.frame;
+    const k = Math.min(1, 960 / Math.max(v.videoWidth, v.videoHeight));
+    const w = Math.round(v.videoWidth * k), h = Math.round(v.videoHeight * k);
+    if (f.width !== w || f.height !== h) { f.width = w; f.height = h; }
+    const g = f.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    if (this.mirror) { g.translate(w, 0); g.scale(-1, 1); }
+    g.drawImage(v, 0, 0, w, h);
+    return f;
+  }
+
+  /** Part of the analysed frame that is visible on screen (preview uses a cover fit), in frame px. */
+  visibleRect() {
+    const f = this.frame, c = this.ui.hud;
+    const cw = c.clientWidth || 1, ch = c.clientHeight || 1;
+    const sc = Math.max(cw / f.width, ch / f.height);
+    const gx = (f.width - cw / sc) / 2, gy = (f.height - ch / sc) / 2;
+    return { x0: gx, y0: gy, x1: f.width - gx, y1: f.height - gy };
   }
 
   /** No face for 3 s (or detector errors) on the GPU delegate: some phones need the CPU one. */
@@ -319,7 +379,7 @@ export class GuidedCapture {
   drawDebug(g, cw, ch, face) {
     const v = this.ui.video;
     const d = this.dbg || {};
-    const t = `${v.videoWidth}x${v.videoHeight} ${visionDelegate()}${this.cpuTried ? '*' : ''} face:${face ? 1 : 0} errs:${this.errs || 0}` +
+    const t = `${v.videoWidth}x${v.videoHeight} ${this.mirror ? 'mir' : 'raw'} ${visionDelegate()}${this.cpuTried ? '*' : ''} face:${face ? 1 : 0} errs:${this.errs || 0}` +
       (face ? ` fit:${d.fit} yaw:${(d.yaw || 0).toFixed(0)} pit:${(d.pitch || 0).toFixed(0)} sc:${(d.score || 0).toFixed(2)}` : '');
     g.font = '11px monospace';
     g.fillStyle = 'rgba(0,0,0,.55)';
@@ -342,7 +402,7 @@ export class GuidedCapture {
     g.clearRect(0, 0, cw, ch);
     const t = performance.now() / 1000;
     const step = this.current;
-    // direction chevrons: the preview is the raw, un-mirrored frame, so "left" = toward the screen's left
+    // direction chevrons: the preview shows exactly the analysed/saved frame, so "left" = toward the screen's left
     if (step && step.key !== 'front') {
       const dir = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }[step.key];
       g.save();
@@ -371,8 +431,9 @@ export class GuidedCapture {
     }
     if (DEBUG) this.drawDebug(g, cw, ch, face);
     if (!face) return;
-    const s = Math.max(cw / v.videoWidth, ch / v.videoHeight); // full-screen fill (object-fit: cover)
-    const ox = (cw - v.videoWidth * s) / 2, oy = (ch - v.videoHeight * s) / 2;
+    const fw = this.frame.width, fh = this.frame.height;
+    const s = Math.max(cw / fw, ch / fh); // full-screen cover fit, same as drawView()
+    const ox = (cw - fw * s) / 2, oy = (ch - fh * s) / 2;
     const X = (p) => ox + p.x * s; // same raw frame as the saved photo
     const Y = (p) => oy + p.y * s;
     const lm = face.landmarks;
@@ -426,7 +487,9 @@ export class GuidedCapture {
     try {
       const v = this.ui.video;
       const frame = canvasOf(v.videoWidth, v.videoHeight);
-      frame.getContext('2d').drawImage(v, 0, 0);
+      const fg = frame.getContext('2d');
+      if (this.mirror) { fg.translate(frame.width, 0); fg.scale(-1, 1); }
+      fg.drawImage(v, 0, 0);
       const shot = await cropHead(frame, frame.width, frame.height);
       if (!shot) {
         this.ui.onError && this.ui.onError('没有检测到人脸，请把脸放进取景框');
