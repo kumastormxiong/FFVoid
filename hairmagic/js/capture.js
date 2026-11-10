@@ -1,49 +1,105 @@
 // Guided head scan: live face mesh, pose targets with auto-shutter, and gallery import.
-import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, FACE_OVAL as OVAL } from './vision.js?v=202611040802';
-import { canvasOf, canvasToBlob } from './composite.js?v=202611040802';
+import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, FACE_OVAL as OVAL } from './vision.js?v=202611101847';
+import { canvasOf, canvasToBlob } from './composite.js?v=202611101847';
 
 export const OUT_W = 768;
 export const OUT_H = 1024;
 
 export const STEPS = [
   { key: 'front', zh: '正面', tip: '正对镜头，保持不动' },
-  { key: 'left', zh: '左侧', tip: '慢慢向左转头' },
-  { key: 'right', zh: '右侧', tip: '慢慢向右转头' },
+  { key: 'left', zh: '左侧', tip: '脸慢慢转向画面左边' },
+  { key: 'right', zh: '右侧', tip: '脸慢慢转向画面右边' },
   { key: 'up', zh: '抬头', tip: '下巴微微抬起' },
   { key: 'down', zh: '低头', tip: '下巴微微收低' },
 ];
 export const ANGLE_ZH = { front: '正面', left: '左侧', right: '右侧', up: '抬头', down: '低头', other: '其他' };
 export const ANGLE_ORDER = { left: 0, up: 1, front: 2, down: 3, right: 4, other: 5 };
 
-/** Geometric head pose from landmarks in an un-mirrored frame. */
+/** Legacy 2D ratios (kept in stored photos for old data); the real pose is headPose(). */
 export function geoPose(lm) {
   const L = lm[234], R = lm[454], nose = lm[1];
   const half = Math.abs(R.x - L.x) / 2 || 1;
-  const yawG = (nose.x - (L.x + R.x) / 2) / half; // + = subject turned to their left
+  const yawG = (nose.x - (L.x + R.x) / 2) / half;
   const eyeY = (lm[33].y + lm[263].y) / 2;
   const pitchR = (nose.y - eyeY) / (lm[152].y - eyeY || 1);
   const roll = (Math.atan2(lm[263].y - lm[33].y, lm[263].x - lm[33].x) * 180) / Math.PI;
   return { yawG, pitchR, roll };
 }
 
+/**
+ * Head pose in degrees from MediaPipe's 3D face fit (vision.poseFromMatrix).
+ * Everything in the app (live preview, thumbnails, studio, imports) shows the same un-mirrored
+ * frame, and "left"/"right" mean what you see there: the face points to the left / right of the photo.
+ *   yaw  < 0 : face points to the LEFT of the photo   (angle "left")
+ *   yaw  > 0 : face points to the RIGHT of the photo  (angle "right")
+ *   pitch: + = head down, - = chin up (relative to the person's own straight-on photo via `base`)
+ */
+export function headPose(face) {
+  return { ...geoPose(face.landmarks), ...face.pose };
+}
+
+const YAW_SIDE = 22; // beyond this a photo counts as a side view
+const PITCH_STEP = 12; // beyond this (vs. the front photo) it counts as looking up / down
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const ramp = (v, from, to) => clamp01((v - from) / (to - from));
+const pitchUp = (p, base = 0) => -(p.pitch - base); // + = chin up
+
 /** 0..1 progress toward a step's pose target. */
-function stepScore(key, p, base) {
-  const steady = Math.abs(p.roll) < 12;
+export function stepScore(key, p, base = 0) {
+  if (Math.abs(p.roll) > 18) return 0;
+  const up = pitchUp(p, base);
   switch (key) {
     case 'front':
-      return steady ? clamp01(1 - Math.abs(p.yawG) / 0.12) * clamp01(1 - (Math.abs(p.roll) - 6) / 6) : 0;
+      return Math.min(1 - ramp(Math.abs(p.yaw), 6, 14), 1 - ramp(Math.abs(up), 6, 14));
     case 'left':
-      return p.yawG > 0.9 ? 0.6 : clamp01(p.yawG / 0.4);
-    case 'right':
-      return p.yawG < -0.9 ? 0.6 : clamp01(-p.yawG / 0.4);
+    case 'right': {
+      const v = key === 'left' ? -p.yaw : p.yaw;
+      const s = v > 48 ? 1 - ramp(v, 48, 58) : ramp(v, 6, 24);
+      return s * (1 - ramp(Math.abs(up), 12, 22));
+    }
     case 'up':
-      return Math.abs(p.yawG) < 0.2 ? clamp01((base - p.pitchR) / 0.07) : 0;
-    case 'down':
-      return Math.abs(p.yawG) < 0.2 ? clamp01((p.pitchR - base) / 0.07) : 0;
+    case 'down': {
+      const v = key === 'up' ? up : -up;
+      const s = v > 35 ? 1 - ramp(v, 35, 45) : ramp(v, 4, 12);
+      return s * (1 - ramp(Math.abs(p.yaw), 12, 22));
+    }
   }
   return 0;
 }
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+/** Short on-screen advice for the current step. */
+export function poseHint(key, p, base = 0) {
+  const up = pitchUp(p, base);
+  if (key === 'front') {
+    if (Math.abs(p.yaw) > 6) return '头摆正，正对镜头';
+    if (Math.abs(up) > 6) return '下巴放平，别抬也别低';
+    return '头摆正，眼睛看镜头';
+  }
+  if (key === 'left' || key === 'right') {
+    const v = key === 'left' ? -p.yaw : p.yaw;
+    if (v > 48) return '转过头了，回来一点';
+    if (Math.abs(up) > 12) return '下巴放平，只转头';
+    if (v < 24) return '再多转一点（约 30°）';
+    return '保持住…';
+  }
+  const v = key === 'up' ? up : -up;
+  if (v > 35) return '幅度小一点就好';
+  if (Math.abs(p.yaw) > 12) return key === 'up' ? '脸朝前，只抬头' : '脸朝前，只低头';
+  if (v < 12) return key === 'up' ? '下巴再抬高一点' : '下巴再收低一点';
+  return '保持住…';
+}
+
+/** Is the whole head comfortably inside the camera frame (not too close, not cut off)? */
+export function frameFit(face, vw, vh) {
+  const b = face.box;
+  const hr = b.h / vh;
+  if (hr > 0.46) return 'near';
+  if (hr < 0.2) return 'far';
+  const m = 0.03;
+  if (b.x < vw * m || b.x + b.w > vw * (1 - m) || b.y + b.h > vh * (1 - m)) return 'edge';
+  if (b.y < b.h * 0.5) return 'top'; // keep room above the forehead for the hair
+  return 'ok';
+}
 
 /** Crop a portrait around the head from any source, return {blob, face(in crop px), pose}. */
 export async function cropHead(source, sw, sh, faceInSource) {
@@ -56,7 +112,7 @@ export async function cropHead(source, sw, sh, faceInSource) {
   g.drawImage(source, r.x, r.y, r.w, r.h, 0, 0, OUT_W, OUT_H);
   const f2 = await detectFace(c);
   const blob = await canvasToBlob(c, 'image/jpeg', 0.92);
-  return { blob, canvas: c, face: f2 || face, pose: geoPose((f2 || face).landmarks) };
+  return { blob, canvas: c, face: f2 || face, pose: headPose(f2 || face) };
 }
 
 export function compactLandmarks(face) {
@@ -69,12 +125,32 @@ export function compactLandmarks(face) {
   return out;
 }
 
-export function classifyAngle(p, baseline = 0.42) {
-  if (p.yawG > 0.3) return 'left';
-  if (p.yawG < -0.3) return 'right';
-  if (p.pitchR < baseline - 0.06) return 'up';
-  if (p.pitchR > baseline + 0.06) return 'down';
-  return 'front';
+export function classifyAngle(p, base = 0) {
+  const up = pitchUp(p, base);
+  const ay = Math.abs(p.yaw) / YAW_SIDE;
+  const ap = Math.abs(up) / PITCH_STEP;
+  if (ay < 1 && ap < 1) return 'front';
+  if (ay >= ap) return p.yaw < 0 ? 'left' : 'right';
+  return up > 0 ? 'up' : 'down';
+}
+
+/**
+ * Label imported photos from their real head pose. The most straight-on photo sets the neutral
+ * pitch. One photo per angle: if two land on the same angle the better fit wins, the other is dropped.
+ * Returns [{shot, angle}].
+ */
+export function planAngles(shots) {
+  if (!shots.length) return [];
+  const frontal = shots.reduce((a, b) => (Math.hypot(b.pose.yaw, b.pose.pitch) < Math.hypot(a.pose.yaw, a.pose.pitch) ? b : a));
+  const base = Math.abs(frontal.pose.yaw) < 12 ? Math.max(-12, Math.min(12, frontal.pose.pitch)) : 0;
+  const best = new Map();
+  for (const shot of shots) {
+    const angle = classifyAngle(shot.pose, base);
+    const fit = stepScore(angle, shot.pose, base);
+    const cur = best.get(angle);
+    if (!cur || fit > cur.fit) best.set(angle, { shot, angle, fit });
+  }
+  return [...best.values()].sort((a, b) => ANGLE_ORDER[a.angle] - ANGLE_ORDER[b.angle]).map(({ shot, angle }) => ({ shot, angle }));
 }
 
 /** Load a File/Blob into a canvas honouring EXIF orientation, capped in size. */
@@ -103,7 +179,7 @@ export class GuidedCapture {
     this.stream = null;
     this.running = false;
     this.done = new Set();
-    this.baseline = 0.42;
+    this.baseline = 0; // neutral pitch (deg) from the person's own front shot
     this.hold = 0;
     this.lastT = 0;
     this.lastFace = null;
@@ -116,11 +192,22 @@ export class GuidedCapture {
 
   async start() {
     await loadVision();
-    const constraints = {
-      audio: false,
-      video: { facingMode: 'user', width: { ideal: 1440 }, height: { ideal: 1920 }, aspectRatio: { ideal: 3 / 4 } },
-    };
-    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const tries = [
+      { audio: false, video: { facingMode: 'user', width: { ideal: 1440 }, height: { ideal: 1920 }, aspectRatio: { ideal: 3 / 4 } } },
+      { audio: false, video: { facingMode: 'user' } },
+    ];
+    let err = null;
+    for (const c of tries) {
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia(c);
+        break;
+      } catch (e) {
+        err = e;
+        if (e.name === 'NotAllowedError' || e.name === 'NotFoundError' || e.name === 'SecurityError') throw e;
+      }
+    }
+    if (!this.stream) throw err;
+    await this.widestView();
     const v = this.ui.video;
     v.srcObject = this.stream;
     v.setAttribute('playsinline', '');
@@ -129,6 +216,18 @@ export class GuidedCapture {
     this.lm = await getVideoLandmarker();
     this.running = true;
     this.loop();
+  }
+
+  /** Use the camera's widest field of view when the browser exposes zoom (some phones start zoomed in). */
+  async widestView() {
+    const track = this.stream && this.stream.getVideoTracks()[0];
+    if (!track || !track.getCapabilities) return;
+    try {
+      const caps = track.getCapabilities();
+      if (caps.zoom && typeof caps.zoom.min === 'number') await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+    } catch (e) {
+      console.warn('zoom-out failed', e);
+    }
   }
 
   stop() {
@@ -157,11 +256,11 @@ export class GuidedCapture {
     const step = this.current;
     let score = 0;
     if (face && step) {
-      const p = geoPose(face.landmarks);
+      const p = headPose(face);
       score = stepScore(step.key, p, this.baseline);
-      const sizeOk = face.box.h > v.videoHeight * 0.22;
-      if (!sizeOk) score = Math.min(score, 0.5);
-      this.ui.onStatus && this.ui.onStatus({ face: true, sizeOk, score, step, pose: p });
+      const fit = frameFit(face, v.videoWidth, v.videoHeight);
+      if (fit !== 'ok') score = Math.min(score, 0.5);
+      this.ui.onStatus && this.ui.onStatus({ face: true, fit, score, step, pose: p, hint: poseHint(step.key, p, this.baseline) });
       if (score >= 0.98 && !this.busy) {
         this.hold += dt;
         if (this.hold > 650) this.shoot(step.key);
@@ -187,7 +286,7 @@ export class GuidedCapture {
     g.clearRect(0, 0, cw, ch);
     const t = performance.now() / 1000;
     const step = this.current;
-    // direction chevrons (selfie preview is mirrored: subject's left = screen left)
+    // direction chevrons: the preview is the raw, un-mirrored frame, so "left" = toward the screen's left
     if (step && step.key !== 'front') {
       const dir = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }[step.key];
       g.save();
@@ -215,9 +314,9 @@ export class GuidedCapture {
       g.restore();
     }
     if (!face) return;
-    const s = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+    const s = Math.min(cw / v.videoWidth, ch / v.videoHeight); // whole frame visible (object-fit: contain)
     const ox = (cw - v.videoWidth * s) / 2, oy = (ch - v.videoHeight * s) / 2;
-    const X = (p) => cw - (ox + p.x * s); // mirrored to match the selfie preview
+    const X = (p) => ox + p.x * s; // same raw frame as the saved photo
     const Y = (p) => oy + p.y * s;
     const lm = face.landmarks;
     const grad = g.createLinearGradient(0, Y({ y: face.box.y }), 0, Y({ y: face.box.y + face.box.h }));
@@ -278,7 +377,7 @@ export class GuidedCapture {
       }
       let angle = key;
       if (manual) angle = classifyAngle(shot.pose, this.baseline);
-      if (angle === 'front' && !this.done.has('front')) this.baseline = shot.pose.pitchR;
+      if (angle === 'front' && !this.done.has('front')) this.baseline = Math.max(-12, Math.min(12, shot.pose.pitch));
       this.done.add(angle);
       await this.ui.onShot(shot, angle);
     } finally {

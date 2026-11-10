@@ -1,16 +1,16 @@
 // HairMagic — app shell: state, studio, capture flow, archive.
-import * as store from './store.js?v=202611040802';
-import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace } from './styles.js?v=202611040802';
+import * as store from './store.js?v=202611101847';
+import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace } from './styles.js?v=202611101847';
 import {
   NEEDS, LENGTH_PRESETS, SEED_LENGTH_NEEDS, GROWTH_CM_PER_MONTH,
   monthsNeeded, gapDetail, describeLength, geometricEstimate,
-} from './length.js?v=202611040802';
-import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611040802';
-import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611040802';
-import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js?v=202611040802';
+} from './length.js?v=202611101847';
+import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611101847';
+import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611101847';
+import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js?v=202611101847';
 import {
-  GuidedCapture, STEPS, ANGLE_ZH, ANGLE_ORDER, cropHead, compactLandmarks, classifyAngle, fileToCanvas,
-} from './capture.js?v=202611040802';
+  GuidedCapture, STEPS, ANGLE_ZH, ANGLE_ORDER, cropHead, compactLandmarks, planAngles, fileToCanvas,
+} from './capture.js?v=202611101847';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -671,7 +671,7 @@ async function openCapture() {
   });
   existing.forEach((a) => cap.done.add(a));
   const front = S.photos.find((p) => p.angle === 'front');
-  if (front && front.pitchR) cap.baseline = front.pitchR;
+  if (front && typeof front.pitch === 'number') cap.baseline = Math.max(-12, Math.min(12, front.pitch));
   renderCapSteps();
   try {
     await cap.start();
@@ -688,6 +688,7 @@ async function savePhoto(shot, angle) {
   await store.addPhoto({
     angle, order: ANGLE_ORDER[angle] ?? 9, blob: shot.blob, w: 768, h: 1024,
     lm: compactLandmarks(shot.face), yawG: shot.pose.yawG, pitchR: shot.pose.pitchR,
+    yaw: shot.pose.yaw, pitch: shot.pose.pitch, // degrees from the 3D face fit
   });
   if (angle === 'front') store.prefs.set('len.' + store.today(), null);
   S.photos = orderPhotos(await store.photosByDate(store.today()));
@@ -703,9 +704,12 @@ function updateCapTip(st) {
   }
   tip.textContent = step.tip;
   if (!st.face) sub.textContent = '把整张脸放进画面中间';
-  else if (st.sizeOk === false) sub.textContent = '靠近一点';
+  else if (st.fit === 'near') sub.textContent = '太近了，手机拿远一点';
+  else if (st.fit === 'far') sub.textContent = '太远了，靠近一点';
+  else if (st.fit === 'edge') sub.textContent = '头别出画面，往中间挪一点';
+  else if (st.fit === 'top') sub.textContent = '头顶要完整入画，手机放低一点或退后';
   else if (st.score >= 0.98) sub.textContent = '保持住…';
-  else sub.textContent = step.key === 'front' ? '头摆正，眼睛看镜头' : step.key === 'left' || step.key === 'right' ? '转到约 30°，脸不要出画' : '幅度小一点就好';
+  else sub.textContent = st.hint || '';
 }
 
 function renderCapSteps() {
@@ -740,29 +744,28 @@ async function importFiles(files, fromCapture) {
   await loadVision();
   const used = new Set();
   let ok = 0;
-  let base = 0.42;
   const shots = [];
   for (const f of list) {
     try {
       const c = await fileToCanvas(f);
       const shot = await cropHead(c, c.width, c.height);
-      if (!shot) continue;
-      shots.push(shot);
+      if (shot) shots.push(shot);
     } catch (e) {
       console.warn(e);
     }
   }
-  // frontmost photo sets the pitch baseline
-  shots.sort((a, b) => Math.abs(a.pose.yawG) - Math.abs(b.pose.yawG));
-  if (shots[0]) base = shots[0].pose.pitchR;
-  for (const [i, shot] of shots.entries()) {
-    let angle = i === 0 ? 'front' : classifyAngle(shot.pose, base);
-    if (used.has(angle)) angle = ['left', 'right', 'up', 'down'].find((a) => !used.has(a)) || 'other';
+  // label every photo from its real 3D head pose; one photo per angle (best fit wins)
+  const plan = planAngles(shots);
+  for (const { shot, angle } of plan) {
     used.add(angle);
     await savePhoto(shot, angle);
     ok++;
   }
-  toast(ok ? `已导入 ${ok} 张` : '没有在照片里找到清晰的人脸');
+  const noFace = list.length - shots.length;
+  const dup = shots.length - plan.length;
+  toast(ok
+    ? `已导入 ${ok} 张` + (dup ? `，${dup} 张角度重复已跳过` : '') + (noFace ? `，${noFace} 张没识别到人脸` : '')
+    : '没有在照片里找到清晰的人脸（侧脸别超过约 50°）');
   if (fromCapture && cap) {
     used.forEach((a) => cap.done.add(a));
     renderCapSteps();
@@ -1020,7 +1023,7 @@ async function pollJob() {
 async function showSplat(blob) {
   v3State('loading', '正在载入 3D 模型…', '');
   try {
-    const { SplatViewer } = await import('./gs3d.js?v=202611040802');
+    const { SplatViewer } = await import('./gs3d.js?v=202611101847');
     if (!viewer) viewer = new SplatViewer($('#v3Canvas'));
     const info = await viewer.load(await blob.arrayBuffer());
     v3State('view', '', `${(info.count / 1000).toFixed(1)}k 个高斯点`);

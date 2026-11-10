@@ -68,13 +68,36 @@ export function getHairSegmenter() {
   return hairSeg;
 }
 
-/** Euler angles (degrees) from MediaPipe's facial transformation matrix (column-major). */
+/**
+ * Head pose (degrees) from MediaPipe's facial transformation matrix.
+ *   yaw  : + = nose points toward the RIGHT side of the image, - = toward the LEFT
+ *   pitch: + = head tilted down, - = chin raised
+ *   roll : in-plane tilt
+ * The flat data may arrive row-major or column-major depending on the runtime, so the layout
+ * is detected from where the translation sits (last column vs. last row). Verified on real
+ * photos (up / down / turned / front) with MediaPipe's Python API, which returns the same matrix.
+ */
 export function poseFromMatrix(m) {
   const d = m.data || m;
-  const R = (r, c) => d[c * 4 + r];
+  const colMajor = Math.abs(d[3]) + Math.abs(d[7]) + Math.abs(d[11]) < 1e-6;
+  const R = (r, c) => (colMajor ? d[c * 4 + r] : d[r * 4 + c]);
   const pitch = (Math.atan2(R(2, 1), R(2, 2)) * 180) / Math.PI;
   const yaw = (Math.asin(Math.max(-1, Math.min(1, -R(2, 0)))) * 180) / Math.PI;
   const roll = (Math.atan2(R(1, 0), R(0, 0)) * 180) / Math.PI;
+  return { yaw, pitch, roll };
+}
+
+/** Same convention as poseFromMatrix, from 3D landmark depth (used if no matrix is returned). */
+export function poseFromLandmarks(lm) {
+  const pairs = [[234, 454], [93, 323], [127, 356], [132, 361], [58, 288]];
+  let dx = 0, dz = 0;
+  for (const [a, b] of pairs) {
+    dx += lm[b].x - lm[a].x;
+    dz += lm[b].z - lm[a].z;
+  }
+  const yaw = (Math.atan2(dz, dx) * 180) / Math.PI;
+  const pitch = (Math.atan2(lm[152].z - lm[10].z, lm[152].y - lm[10].y) * 180) / Math.PI;
+  const roll = (Math.atan2(lm[263].y - lm[33].y, lm[263].x - lm[33].x) * 180) / Math.PI;
   return { yaw, pitch, roll };
 }
 
@@ -99,7 +122,7 @@ export function packFace(res, w, h) {
   }
   const pose = res.facialTransformationMatrixes && res.facialTransformationMatrixes[0]
     ? poseFromMatrix(res.facialTransformationMatrixes[0])
-    : { yaw: 0, pitch: 0, roll: 0 };
+    : poseFromLandmarks(lm);
   return { landmarks: lm, pose, box: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, width: w, height: h };
 }
 
