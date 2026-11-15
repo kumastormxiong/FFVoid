@@ -1,17 +1,17 @@
 // HairMagic — app shell: state, studio, capture flow, archive.
-import * as store from './store.js?v=202611150506';
-import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace, colorName, colorByZh } from './styles.js?v=202611150506';
-import { t, tn, getLang, setLang, applyStatic, onLangChange } from './i18n.js?v=202611150506';
+import * as store from './store.js?v=202611150858';
+import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace, colorName, colorByZh } from './styles.js?v=202611150858';
+import { t, tn, getLang, setLang, applyStatic, onLangChange } from './i18n.js?v=202611150858';
 import {
   NEEDS, LENGTH_PRESETS, SEED_LENGTH_NEEDS, GROWTH_CM_PER_MONTH,
   monthsNeeded, gapDetail, describeLength, lengthIndex, presetName, serviceName, geometricEstimate,
-} from './length.js?v=202611150506';
-import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611150506';
-import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611150506';
-import { loadVision, detectFace, faceShape, faceShapeName } from './vision.js?v=202611150506';
+} from './length.js?v=202611150858';
+import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611150858';
+import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611150858';
+import { loadVision, detectFace, faceShape, faceShapeName } from './vision.js?v=202611150858';
 import {
   GuidedCapture, STEPS, angleName, ANGLE_ORDER, cropHead, compactLandmarks, planAngles, fileToCanvas,
-} from './capture.js?v=202611150506';
+} from './capture.js?v=202611150858';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1003,8 +1003,8 @@ async function open3D() {
   $('#viewer3d').hidden = false;
   document.body.style.overflow = 'hidden';
   $('#v3Title').textContent = holderLabel(h) || t('v3.title');
+  if (h.gsJob) return pollJob();          // a rebuild in progress wins over the older model
   if (h.gsBlob) return showSplat(h.gsBlob);
-  if (h.gsJob) return pollJob();
   return open3DIntro();
 }
 
@@ -1041,6 +1041,7 @@ async function start3DJob() {
       label,
       source: isOrig() ? 'original' : 'look',
       date: S.date,
+      fmt: 'hmg', // compact SPZ head with hair mask (dye palette) and expression / blink offsets
     };
     const { id } = await createGsJob({ views, meta, label });
     const h = gsHolder();
@@ -1114,21 +1115,103 @@ async function pollJob() {
 async function showSplat(blob) {
   v3State('loading', t('v3.loading'), '');
   try {
-    const { SplatViewer } = await import('./gs3d.js?v=202611150506');
+    const { SplatViewer } = await import('./gs3d.js?v=202611150858');
     if (!viewer) viewer = new SplatViewer($('#v3Canvas'));
     const info = await viewer.load(await blob.arrayBuffer());
     v3State('view', '', t('v3.points', { n: (info.count / 1000).toFixed(1) }));
+    setupFx();
   } catch (e) {
     console.error(e);
     v3State('error', t('v3.loadfail'), t('v3.loadfail.sub'));
   }
 }
 
+// ---- 3D extras: expressions, blink, hair colour (only for .hmg heads)
+const EXPR_ORDER = ['base', 'smile', 'annoyed', 'angry', 'surprise'];
+const DYES = [
+  ['orig', null, null],
+  ['black', [0.07, 0.06, 0.06], '#16120f'],
+  ['darkbrown', [0.2, 0.12, 0.08], '#3b2417'],
+  ['chestnut', [0.36, 0.18, 0.1], '#6a341c'],
+  ['milktea', [0.55, 0.42, 0.32], '#a68266'],
+  ['blonde', [0.78, 0.64, 0.44], '#dcbc84'],
+  ['wine', [0.38, 0.07, 0.12], '#701524'],
+  ['pink', [0.85, 0.5, 0.62], '#eba1b7'],
+  ['blue', [0.38, 0.48, 0.62], '#7389a8'],
+  ['silver', [0.7, 0.7, 0.72], '#c6c6cb'],
+];
+const fx = { expr: 'base', blink: false, dye: 'orig', light: 0 };
+
+function setupFx() {
+  const f = (viewer && viewer.features) || {};
+  const hasExpr = f.expressions && f.expressions.length > 0;
+  $('#v3Fx').hidden = !(hasExpr || f.hair);
+  $('#v3ExprRow').hidden = !hasExpr;
+  $('#v3DyeRow').hidden = !f.hair;
+  $('#v3ShadeRow').hidden = !f.hair || fx.dye === 'orig';
+  $('#v3Blink').hidden = !f.blink;
+  $('#v3Hint').textContent = hasExpr || f.hair ? t('v3.hint') : t('v3.upgrade');
+  if (hasExpr) {
+    const names = EXPR_ORDER.filter((n) => n === 'base' || f.expressions.includes(n));
+    $('#v3Expr').innerHTML = names
+      .map((n) => `<button class="v3-chip${fx.expr === n ? ' is-on' : ''}" type="button" data-expr="${n}">${t('v3.expr.' + n)}</button>`)
+      .join('');
+    viewer.setExpression(fx.expr);
+    viewer.setBlink(fx.blink);
+    $('#v3Blink').setAttribute('aria-pressed', fx.blink);
+  }
+  if (f.hair) {
+    $('#v3Dye').innerHTML = DYES.map(
+      ([k, , css]) =>
+        `<button class="v3-sw${k === 'orig' ? ' is-orig' : ''}${fx.dye === k ? ' is-on' : ''}" type="button" data-dye="${k}"><i${css ? ` style="background:${css}"` : ''}></i>${t('dye.' + k)}</button>`
+    ).join('');
+    $('#v3Light').value = fx.light;
+    applyDye();
+  }
+}
+
+function applyDye() {
+  if (!viewer) return;
+  const d = DYES.find((x) => x[0] === fx.dye) || DYES[0];
+  viewer.setDye(d[1], d[1] ? fx.light : 0);
+  $('#v3ShadeRow').hidden = !d[1];
+}
+
+function bindFx() {
+  $('#v3Expr').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-expr]');
+    if (!b || !viewer) return;
+    fx.expr = b.dataset.expr;
+    $$('#v3Expr .v3-chip').forEach((c) => c.classList.toggle('is-on', c === b));
+    viewer.setExpression(fx.expr);
+  });
+  $('#v3Blink').onclick = () => {
+    fx.blink = !fx.blink;
+    $('#v3Blink').setAttribute('aria-pressed', fx.blink);
+    viewer && viewer.setBlink(fx.blink);
+  };
+  $('#v3Dye').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-dye]');
+    if (!b) return;
+    fx.dye = b.dataset.dye;
+    $$('#v3Dye .v3-sw').forEach((c) => c.classList.toggle('is-on', c === b));
+    applyDye();
+  });
+  let raf = 0;
+  $('#v3Light').addEventListener('input', (e) => {
+    fx.light = +e.target.value;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(applyDye);
+  });
+}
+
 function save3D() {
   const h = v3Holder;
   if (!h || !h.gsBlob) return;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(h.gsBlob);
+  // .hmg heads are exported as a standard .ply (with the current hair colour and expression)
+  const out = (viewer && viewer.features && (viewer.features.hair || viewer.features.expressions.length) && viewer.exportPly()) || h.gsBlob;
+  a.href = URL.createObjectURL(out);
   a.download = `hairmagic-${h.date}-${fileSafe(holderLabel(h))}.ply`;
   document.body.appendChild(a);
   a.click();
@@ -1195,6 +1278,8 @@ function bind() {
     viewer && viewer.setAutoRotate(on);
   };
   $('#v3Save').onclick = save3D;
+  $('#v3Redo').onclick = () => start3DJob(true);
+  bindFx();
   $('#v3Train').onclick = () => start3DJob(true);
   $$('.pills').forEach((g) =>
     $$('.pill', g).forEach((p) => (p.onclick = () => {
@@ -1242,6 +1327,7 @@ function refreshLang() {
   if (!$('#sheetDates').hidden) openDateSheet();
   if (!$('#viewer3d').hidden && v3Holder) $('#v3Title').textContent = holderLabel(v3Holder) || t('v3.title');
   const vs = $('#viewer3d');
+  if (vs.dataset.state === 'view' && viewer) setupFx();
   if (vs.dataset.state === 'intro') open3DIntro();
   else $('#v3Train').textContent = t(vs.dataset.state === 'error' ? 'v3.retrain' : 'v3.train');
 }

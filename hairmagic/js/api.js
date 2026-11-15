@@ -1,5 +1,5 @@
 // Client for the HairMagic Pages Function.
-import { t } from './i18n.js?v=202611150506';
+import { t } from './i18n.js?v=202611150858';
 const API = new URL('../api/', import.meta.url).href;
 
 export class ApiError extends Error {

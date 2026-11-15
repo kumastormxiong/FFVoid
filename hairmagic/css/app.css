@@ -418,7 +418,28 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .v3-progress span { display: block; height: 100%; width: 0; background: var(--sheen); transition: width .6s ease; }
 .v3-tools { position: absolute; left: 0; right: 0; bottom: 0; padding: 30px var(--gutter) calc(var(--safe-b) + 18px); background: linear-gradient(transparent, rgba(0,0,0,.55)); text-align: center; }
 .v3-hint { margin: 0 0 12px; font-size: 12.5px; color: rgba(255,255,255,.7); }
-.v3-btns { display: flex; gap: 8px; justify-content: center; }
+.v3-btns { display: flex; gap: 6px; justify-content: center; }
+.v3-btns .icon-btn { white-space: nowrap; padding: 0 10px 0 8px; }
+@media (max-width: 400px) { .v3-btns .icon-btn { font-size: 12px; gap: 4px; padding: 0 9px 0 7px; } }
+.v3-fx { display: flex; flex-direction: column; gap: 10px; margin: 0 calc(-1 * var(--gutter)) 12px; }
+.v3-row { display: flex; align-items: center; gap: 8px; padding: 0 var(--gutter); }
+.v3-chips, .v3-swatches { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; flex: 1; min-width: 0; padding: 2px 0; }
+.v3-chips::-webkit-scrollbar, .v3-swatches::-webkit-scrollbar { display: none; }
+.v3-chip { flex: none; height: 32px; padding: 0 13px; border-radius: 16px; border: 1px solid rgba(255,255,255,.22); background: rgba(20,22,27,.55); color: #fff; font: inherit; font-size: 13px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.v3-chip.is-on { background: #fff; color: #111; border-color: #fff; }
+.v3-toggle { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,.22); background: rgba(20,22,27,.55); color: #fff; font: inherit; font-size: 13px; }
+.v3-dot { width: 22px; height: 13px; border-radius: 7px; background: rgba(255,255,255,.25); position: relative; transition: background .2s; }
+.v3-dot::after { content: ''; position: absolute; top: 2px; left: 2px; width: 9px; height: 9px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.v3-toggle[aria-pressed="true"] .v3-dot { background: var(--sheen, #7c5cff); }
+.v3-toggle[aria-pressed="true"] .v3-dot::after { transform: translateX(9px); }
+.v3-sw { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 54px; white-space: nowrap; border: 0; background: none; color: rgba(255,255,255,.75); font: inherit; font-size: 10.5px; padding: 0; }
+.v3-sw i { display: block; width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); box-shadow: inset 0 -6px 10px rgba(0,0,0,.25), inset 0 4px 8px rgba(255,255,255,.18); }
+.v3-sw.is-on { color: #fff; }
+.v3-sw.is-on i { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+.v3-sw.is-orig i { background: conic-gradient(#2a211c, #6b4a35, #2a211c, #6b4a35, #2a211c); }
+.v3-shade { gap: 10px; font-size: 12px; color: rgba(255,255,255,.75); }
+.v3-shade input { flex: 1; accent-color: #fff; }
+
 .viewer3d .icon-btn { background: rgba(255,255,255,.14); color: #fff; }
 .viewer3d .icon-btn[aria-pressed="true"] { background: #fff; color: var(--ink); }
 .viewer3d:not([data-state="view"]) .v3-tools { display: none; }
