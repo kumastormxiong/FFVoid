@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>HairMagic · 发型魔镜</title>
-  <meta name="description" content="用手机拍 3–5 张头像，AI 真实感试发型：50 款发型、随机种子、按日期保存。" />
+  <title>HairMagic</title>
+  <meta name="description" content="Take 3–5 selfies and try on 50 realistic AI hairstyles, random seeds, and keep everything by date." />
   <meta name="theme-color" content="#e9ecf0" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./css/app.css?v=202611101949" />
+  <link rel="stylesheet" href="./css/app.css?v=202611150506" />
   <script>
     /* boot watchdog: shows a readable message and reports the error if the app cannot start */
     (function () {
@@ -29,6 +29,8 @@
           x.send(JSON.stringify({ msg: String(m).slice(0, 1500), ua: navigator.userAgent, url: location.href }));
         } catch (e) {}
       }
+      var ZH = false;
+      try { ZH = localStorage.getItem('hm.lang') === 'zh'; } catch (e) {}
       function show(m) {
         var d = document.getElementById('bootErr');
         if (!d) {
@@ -44,7 +46,7 @@
       window.addEventListener('error', function (e) {
         var m = (e.message || 'error') + (e.filename ? ' @' + e.filename.split('/').pop() + ':' + e.lineno : '');
         report('error: ' + m);
-        if (!window.__hmBooted) show('页面脚本出错：' + m);
+        if (!window.__hmBooted) show((ZH ? '页面脚本出错：' : 'Page script error: ') + m);
       });
       window.addEventListener('unhandledrejection', function (e) {
         var r = e.reason;
@@ -53,7 +55,7 @@
       setTimeout(function () {
         if (!window.__hmBooted) {
           report('boot timeout');
-          show('页面没有加载完成。请用最新版 Safari 或 Chrome 打开 ffvoid.com/hairmagic；如果是在微信等 App 里打开的，请点右上角选择“在浏览器中打开”。');
+          show(ZH ? '页面没有加载完成。请用最新版 Safari 或 Chrome 打开 ffvoid.com/hairmagic；如果是在微信等 App 里打开的，请点右上角选择“在浏览器中打开”。' : 'The page did not finish loading. Please open ffvoid.com/hairmagic in the latest Safari or Chrome. If you are inside an app such as WeChat, tap the top-right menu and choose “Open in browser”.');
         }
       }, 9000);
     })();
@@ -71,14 +73,17 @@
 <body>
   <div class="app" id="app">
     <header class="topbar">
-      <a class="brand" href="./" aria-label="HairMagic 首页">
+      <a class="brand" href="./" aria-label="HairMagic home" data-i18n-attr="aria-label:brand.aria">
         <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#49d6e8"/><stop offset=".55" stop-color="#8f7cf7"/><stop offset="1" stop-color="#f39bc0"/></linearGradient></defs><path d="M6 21c0-9 5-15 11-15 5 0 9 4 9 10" fill="none" stroke="url(#bg1)" stroke-width="3" stroke-linecap="round"/><path d="M9 22c1-6 4-10 8-10 3 0 5 2 6 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="24" r="2.2" fill="currentColor"/></svg>
         <span>HairMagic</span>
       </a>
-      <button class="date-chip" id="dateChip" type="button" aria-label="切换日期">
-        <span id="dateLabel">今天</span>
+      <div class="top-actions">
+      <button class="lang-chip" id="langChip" type="button" aria-label="Switch language to Chinese" data-i18n-attr="aria-label:lang.aria"><span data-i18n="lang.switch">中文</span></button>
+      <button class="date-chip" id="dateChip" type="button" aria-label="Change date" data-i18n-attr="aria-label:date.aria">
+        <span id="dateLabel">Today</span>
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
+      </div>
     </header>
 
     <!-- STUDIO -->
@@ -92,11 +97,11 @@
             <path d="M20 104h22M158 104h22M100 18v14M100 176v14" stroke="#c7ccd4" stroke-width="1.5"/>
           </svg>
         </div>
-        <h1>拍下你的头，<br />再换一万种发型。</h1>
-        <p>前置摄像头会引导你拍 3–5 个角度：正面、左右侧、抬头、低头。照片只保存在这台手机上，按日期归档。</p>
+        <h1 data-i18n-html="empty.h1">Scan your head,<br />then try endless hairstyles.</h1>
+        <p data-i18n="empty.p">The front camera guides you through 3–5 angles: front, left, right, up and down. Photos stay on this phone, filed by date.</p>
         <div class="empty-actions">
-          <button class="btn btn-sheen" id="startScan" type="button">开始扫描头像</button>
-          <label class="btn btn-ghost">从相册选择
+          <button class="btn btn-sheen" id="startScan" type="button" data-i18n="empty.scan">Start head scan</button>
+          <label class="btn btn-ghost"><span data-i18n="empty.pick">Choose from photos</span>
             <input type="file" id="pickFiles" accept="image/*" multiple hidden />
           </label>
         </div>
@@ -105,55 +110,55 @@
       <section class="studio" id="studio" hidden>
         <div class="stage-wrap">
           <div class="stage" id="stage" aria-live="polite">
-            <img class="stage-img" id="stageBase" alt="原始照片" />
-            <div class="stage-after" id="stageAfterWrap"><img class="stage-img" id="stageAfter" alt="新发型效果" /></div>
+            <img class="stage-img" id="stageBase" alt="Original photo" data-i18n-attr="alt:stage.base.alt" />
+            <div class="stage-after" id="stageAfterWrap"><img class="stage-img" id="stageAfter" alt="New hairstyle" data-i18n-attr="alt:stage.after.alt" /></div>
             <canvas class="stage-scan" id="stageScan" aria-hidden="true"></canvas>
             <div class="compare-handle" id="compareHandle" hidden><span></span></div>
             <div class="stage-top">
-              <span class="tag" id="stageAngle">正面</span>
+              <span class="tag" id="stageAngle">Front</span>
               <span class="tag tag-quiet" id="stageInfo" hidden></span>
             </div>
             <div class="stage-bottom">
-              <button class="icon-btn" id="btnCompare" type="button" aria-pressed="false" title="对比原图">
+              <button class="icon-btn" id="btnCompare" type="button" aria-pressed="false" title="Compare with original" data-i18n-attr="title:stage.compare.title">
                 <svg viewBox="0 0 24 24"><path d="M12 3v18M5 6h4v12H5zM15 6h4v12h-4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-                <span>对比</span>
+                <span data-i18n="stage.compare">Compare</span>
               </button>
-              <button class="icon-btn icon-btn-3d" id="btn3d" type="button" title="3D 高斯泼溅头像" hidden>
+              <button class="icon-btn icon-btn-3d" id="btn3d" type="button" title="3D Gaussian splat head" data-i18n-attr="title:stage.3d.title" hidden>
                 <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z M12 12l8-4.5M12 12v9M12 12L4 7.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
                 <span>3D</span>
               </button>
-              <button class="icon-btn" id="btnSave" type="button" title="保存图片" hidden>
+              <button class="icon-btn" id="btnSave" type="button" title="Save image" data-i18n-attr="title:stage.save.title" hidden>
                 <svg viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <span>保存</span>
+                <span data-i18n="stage.save">Save</span>
               </button>
             </div>
-            <div class="stage-progress" id="stageProgress" hidden><span id="stageProgressText">正在生成…</span></div>
+            <div class="stage-progress" id="stageProgress" hidden><span id="stageProgressText">Generating…</span></div>
           </div>
-          <div class="angles" id="angles" role="tablist" aria-label="拍摄角度"></div>
-          <button class="retake" id="btnRetake" type="button" hidden>重拍今天的原始照片</button>
+          <div class="angles" id="angles" role="tablist" aria-label="Capture angles" data-i18n-attr="aria-label:angles.aria"></div>
+          <button class="retake" id="btnRetake" type="button" data-i18n="retake" hidden>Retake today’s original photos</button>
         </div>
 
         <div class="panel">
           <button class="hairlen" id="hairLen" type="button">
-            <span class="hairlen-label">当前发长</span>
-            <span class="hairlen-value" id="hairLenValue">分析中…</span>
-            <span class="hairlen-edit">调整</span>
+            <span class="hairlen-label" data-i18n="len.label">Current hair length</span>
+            <span class="hairlen-value" id="hairLenValue">Analyzing…</span>
+            <span class="hairlen-edit" data-i18n="len.adjust">Adjust</span>
           </button>
 
           <div class="looks" id="looksRow" hidden>
-            <div class="row-title"><h2>今天的造型</h2><span id="looksCount"></span></div>
+            <div class="row-title"><h2 data-i18n="looks.title">Today’s looks</h2><span id="looksCount"></span></div>
             <div class="looks-rail" id="looksRail"></div>
           </div>
 
-          <div class="line-toggle" role="group" aria-label="发型类别">
-            <button class="line-btn is-on" data-line="m" type="button" aria-pressed="true">男士发型</button>
-            <button class="line-btn" data-line="f" type="button" aria-pressed="false">女士发型</button>
+          <div class="line-toggle" role="group" aria-label="Hairstyle category" data-i18n-attr="aria-label:line.aria">
+            <button class="line-btn is-on" data-line="m" type="button" aria-pressed="true" data-i18n="line.m">Men’s styles</button>
+            <button class="line-btn" data-line="f" type="button" aria-pressed="false" data-i18n="line.f">Women’s styles</button>
           </div>
 
-          <div class="seg" role="tablist" aria-label="造型来源">
-            <button role="tab" class="seg-btn is-on" data-mode="now" aria-selected="true">现在可剪</button>
-            <button role="tab" class="seg-btn" data-mode="all" aria-selected="false">全部 50 款</button>
-            <button role="tab" class="seg-btn" data-mode="seed" aria-selected="false">随机种子</button>
+          <div class="seg" role="tablist" aria-label="Style source" data-i18n-attr="aria-label:seg.aria">
+            <button role="tab" class="seg-btn is-on" data-mode="now" aria-selected="true" data-i18n="seg.now">Ready to cut</button>
+            <button role="tab" class="seg-btn" data-mode="all" aria-selected="false" data-i18n="seg.all">All 50 styles</button>
+            <button role="tab" class="seg-btn" data-mode="seed" aria-selected="false" data-i18n="seg.seed">Random seed</button>
           </div>
 
           <div class="mode mode-styles" id="modeStyles">
@@ -164,44 +169,44 @@
           <div class="mode mode-seed" id="modeSeed" hidden>
             <div class="seed-card">
               <div class="seed-head">
-                <label for="seedInput">种子</label>
+                <label for="seedInput" data-i18n="seed.label">Seed</label>
                 <input id="seedInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" />
-                <button class="dice" id="seedDice" type="button" aria-label="换一个随机种子">
+                <button class="dice" id="seedDice" type="button" aria-label="New random seed" data-i18n-attr="aria-label:seed.dice">
                   <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="8.5" r="1.4"/><circle cx="15.5" cy="15.5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="15.5" cy="8.5" r="1.4"/><circle cx="8.5" cy="15.5" r="1.4"/></svg>
                 </button>
               </div>
               <p class="seed-desc" id="seedDesc"></p>
               <p class="seed-grow" id="seedGrow"></p>
               <div class="toggles">
-                <label class="switch"><input type="checkbox" id="seedGrowOk" /><span></span>允许需要留发的造型</label>
-                <label class="switch"><input type="checkbox" id="seedColor" checked /><span></span>随机发色</label>
+                <label class="switch"><input type="checkbox" id="seedGrowOk" /><span></span><i data-i18n="seed.grow" style="font-style:normal">Allow styles that need growing out</i></label>
+                <label class="switch"><input type="checkbox" id="seedColor" checked /><span></span><i data-i18n="seed.color" style="font-style:normal">Random hair color</i></label>
               </div>
             </div>
           </div>
 
           <div class="colors-block" id="colorsBlock">
-            <div class="row-title"><h2>发色</h2><span id="colorName">原色</span></div>
-            <div class="colors" id="colors" role="radiogroup" aria-label="发色"></div>
+            <div class="row-title"><h2 data-i18n="color.title">Hair color</h2><span id="colorName">Original</span></div>
+            <div class="colors" id="colors" role="radiogroup" aria-label="Hair color" data-i18n-attr="aria-label:color.title"></div>
           </div>
 
           <div class="options">
             <div class="opt">
-              <span class="opt-label">生成范围</span>
+              <span class="opt-label" data-i18n="opt.scope">Scope</span>
               <div class="pills" data-opt="scope">
-                <button class="pill is-on" data-v="one">当前角度</button>
-                <button class="pill" data-v="all">全部角度</button>
+                <button class="pill is-on" data-v="one" data-i18n="opt.scope.one">Current angle</button>
+                <button class="pill" data-v="all" data-i18n="opt.scope.all">All angles</button>
               </div>
             </div>
             <div class="opt">
-              <span class="opt-label">画质</span>
+              <span class="opt-label" data-i18n="opt.quality">Quality</span>
               <div class="pills" data-opt="quality">
-                <button class="pill is-on" data-v="fast">极速</button>
-                <button class="pill" data-v="hd">高清</button>
+                <button class="pill is-on" data-v="fast" data-i18n="opt.quality.fast">Fast</button>
+                <button class="pill" data-v="hd" data-i18n="opt.quality.hd">HD</button>
               </div>
             </div>
             <div class="opt">
-              <span class="opt-label">原貌锁定</span>
-              <label class="switch"><input type="checkbox" id="lockFace" checked /><span></span><em>保留五官不被 AI 改动</em></label>
+              <span class="opt-label" data-i18n="opt.lock">Identity lock</span>
+              <label class="switch"><input type="checkbox" id="lockFace" checked /><span></span><em data-i18n="opt.lock.desc">Keep facial features unchanged by AI</em></label>
             </div>
           </div>
           <div class="spacer"></div>
@@ -209,7 +214,7 @@
 
         <div class="gen-bar">
           <div class="gen-summary" id="genSummary"></div>
-          <button class="btn btn-sheen btn-gen" id="btnGenerate" type="button">生成造型</button>
+          <button class="btn btn-sheen btn-gen" id="btnGenerate" type="button" data-i18n="gen.btn">Generate look</button>
         </div>
       </section>
     </main>
@@ -217,24 +222,24 @@
     <!-- ARCHIVE -->
     <main class="view" id="view-archive" data-view="archive" hidden>
       <div class="archive-head">
-        <h1>档案</h1>
-        <p>每天拍的头像和造型都按日期留在这台设备上。</p>
+        <h1 data-i18n="archive.title">Archive</h1>
+        <p data-i18n="archive.desc">Every day’s photos and looks are kept on this device, by date.</p>
       </div>
       <div class="archive-list" id="archiveList"></div>
     </main>
 
-    <nav class="tabbar" aria-label="主导航">
+    <nav class="tabbar" aria-label="Main navigation" data-i18n-attr="aria-label:nav.aria">
       <button class="tab is-on" data-go="studio" type="button">
         <svg viewBox="0 0 24 24"><path d="M5 19c0-8 3-14 8-14 4 0 6 3 6 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="13" cy="15" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
-        <span>造型</span>
+        <span data-i18n="nav.looks">Looks</span>
       </button>
-      <button class="tab tab-scan" data-go="scan" type="button" aria-label="扫描头像">
+      <button class="tab tab-scan" data-go="scan" type="button" aria-label="Scan head" data-i18n-attr="aria-label:nav.scan.aria">
         <span class="scan-orb"><svg viewBox="0 0 24 24"><path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
-        <span>扫描</span>
+        <span data-i18n="nav.scan">Scan</span>
       </button>
       <button class="tab" data-go="archive" type="button">
         <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 9.5h16M9 3v4M15 3v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-        <span>档案</span>
+        <span data-i18n="nav.archive">Archive</span>
       </button>
     </nav>
   </div>
@@ -244,20 +249,20 @@
     <video id="camVideo" playsinline muted></video>
     <canvas id="camHud"></canvas>
     <div class="cap-top">
-      <button class="cap-close" id="capClose" type="button" aria-label="关闭">
+      <button class="cap-close" id="capClose" type="button" aria-label="Close" data-i18n-attr="aria-label:cap.close">
         <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       </button>
-      <div class="cap-tip"><strong id="capTip">正在启动摄像头…</strong><span id="capSub"></span></div>
+      <div class="cap-tip"><strong id="capTip">Starting camera…</strong><span id="capSub"></span></div>
     </div>
     <div class="cap-bottom">
       <ol class="cap-steps" id="capSteps"></ol>
       <div class="cap-actions">
-        <label class="cap-side" title="从相册导入">
+        <label class="cap-side" title="Import from photos" data-i18n-attr="title:cap.import.title">
           <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 16l4-4.5 3 3 2-2 2.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
           <input type="file" id="capFiles" accept="image/*" multiple hidden />
         </label>
-        <button class="shutter" id="capShutter" type="button" aria-label="手动拍摄"><span></span></button>
-        <button class="cap-side cap-done" id="capDone" type="button" disabled>完成</button>
+        <button class="shutter" id="capShutter" type="button" aria-label="Shoot manually" data-i18n-attr="aria-label:cap.shutter"><span></span></button>
+        <button class="cap-side cap-done" id="capDone" type="button" disabled>Done</button>
       </div>
     </div>
     <div class="cap-flash" id="capFlash"></div>
@@ -265,26 +270,26 @@
 
   <!-- SHEETS -->
   <div class="sheet-scrim" id="sheetScrim" hidden></div>
-  <section class="sheet" id="sheetLen" hidden aria-label="调整当前发长">
+  <section class="sheet" id="sheetLen" hidden aria-label="Adjust current hair length" data-i18n-attr="aria-label:len.sheet.aria">
     <div class="sheet-grip"></div>
-    <h2>当前发长</h2>
-    <p class="sheet-note" id="lenSource">AI 根据正面照估算，可以手动修正，造型推荐会跟着变。</p>
+    <h2 data-i18n="len.label">Current hair length</h2>
+    <p class="sheet-note" id="lenSource">Estimated by AI from your front photo. You can correct it and the recommendations will follow.</p>
     <div class="len-presets" id="lenPresets"></div>
     <div class="len-sliders">
-      <label><span>顶部</span><input type="range" min="0.5" max="60" step="0.5" id="lenTop" /><output id="lenTopV"></output></label>
-      <label><span>两侧</span><input type="range" min="0.5" max="60" step="0.5" id="lenSide" /><output id="lenSideV"></output></label>
-      <label><span>后部</span><input type="range" min="0.5" max="60" step="0.5" id="lenBack" /><output id="lenBackV"></output></label>
+      <label><span data-i18n="len.top">Top</span><input type="range" min="0.5" max="60" step="0.5" id="lenTop" /><output id="lenTopV"></output></label>
+      <label><span data-i18n="len.side">Sides</span><input type="range" min="0.5" max="60" step="0.5" id="lenSide" /><output id="lenSideV"></output></label>
+      <label><span data-i18n="len.back">Back</span><input type="range" min="0.5" max="60" step="0.5" id="lenBack" /><output id="lenBackV"></output></label>
     </div>
-    <p class="sheet-note">头发平均每月长约 1.25 cm。</p>
+    <p class="sheet-note" data-i18n="len.growth">Hair grows about 1.25 cm per month.</p>
     <div class="sheet-actions">
-      <button class="btn btn-ghost" id="lenReanalyze" type="button">重新 AI 估算</button>
-      <button class="btn btn-ink" id="lenDone" type="button">完成</button>
+      <button class="btn btn-ghost" id="lenReanalyze" type="button" data-i18n="len.reanalyze">Re-estimate with AI</button>
+      <button class="btn btn-ink" id="lenDone" type="button" data-i18n="len.done">Done</button>
     </div>
   </section>
 
-  <section class="sheet" id="sheetDates" hidden aria-label="选择日期">
+  <section class="sheet" id="sheetDates" hidden aria-label="Choose date" data-i18n-attr="aria-label:dates.title">
     <div class="sheet-grip"></div>
-    <h2>选择日期</h2>
+    <h2 data-i18n="dates.title">Choose date</h2>
     <div class="date-list" id="dateList"></div>
   </section>
 
@@ -292,25 +297,25 @@
   <div class="viewer3d" id="viewer3d" data-state="intro" hidden>
     <div class="v3-canvas" id="v3Canvas"></div>
     <div class="v3-top">
-      <button class="cap-close" id="v3Close" type="button" aria-label="关闭">
+      <button class="cap-close" id="v3Close" type="button" aria-label="Close" data-i18n-attr="aria-label:v3.close">
         <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       </button>
-      <div class="v3-title"><strong id="v3Title">3D 发型</strong><span>3D Gaussian Splatting</span></div>
+      <div class="v3-title"><strong id="v3Title">3D hairstyle</strong><span>3D Gaussian Splatting</span></div>
     </div>
     <div class="v3-panel">
       <p class="v3-status" id="v3Status"></p>
       <p class="v3-sub" id="v3Sub"></p>
       <div class="v3-progress"><span id="v3Bar"></span></div>
-      <button class="btn btn-sheen v3-train" id="v3Train" type="button">开始训练 3D 头像</button>
+      <button class="btn btn-sheen v3-train" id="v3Train" type="button">Train 3D head</button>
     </div>
     <div class="v3-tools">
-      <p class="v3-hint">拖动旋转 · 双指缩放 · 双指平移</p>
+      <p class="v3-hint" data-i18n="v3.hint">Drag to rotate · pinch to zoom · two fingers to pan</p>
       <div class="v3-btns">
         <button class="icon-btn" id="v3Spin" type="button" aria-pressed="false">
-          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.6M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>自动旋转</span>
+          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.6M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="v3.spin">Auto-rotate</span>
         </button>
         <button class="icon-btn" id="v3Reset" type="button">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>正面</span>
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span data-i18n="v3.reset">Front</span>
         </button>
         <button class="icon-btn" id="v3Save" type="button">
           <svg viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>.ply</span>
@@ -321,7 +326,7 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script type="module" src="./js/app.js?v=202611101949"></script>
-  <script nomodule>document.body.insertAdjacentHTML("beforeend","<div style=\"position:fixed;inset:auto 12px 88px;background:#14161b;color:#fff;padding:12px;border-radius:12px\">这个浏览器太旧，无法运行 HairMagic。请更新系统或改用最新版 Safari / Chrome。</div>")</script>
+  <script type="module" src="./js/app.js?v=202611150506"></script>
+  <script nomodule>document.body.insertAdjacentHTML("beforeend","<div style=\"position:fixed;inset:auto 12px 88px;background:#14161b;color:#fff;padding:12px;border-radius:12px\">This browser is too old to run HairMagic. Please update your system or use the latest Safari / Chrome. 这个浏览器太旧，无法运行 HairMagic，请更新系统或改用最新版 Safari / Chrome。</div>")</script>
 </body>
 </html>

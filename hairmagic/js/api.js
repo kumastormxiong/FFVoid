@@ -1,4 +1,5 @@
 // Client for the HairMagic Pages Function.
+import { t } from './i18n.js?v=202611150506';
 const API = new URL('../api/', import.meta.url).href;
 
 export class ApiError extends Error {
@@ -69,12 +70,12 @@ export function errorText(e) {
     reset.setUTCHours(24, 0, 0, 0);
     const hh = String(reset.getHours()).padStart(2, '0');
     const mm = String(reset.getMinutes()).padStart(2, '0');
-    return `今天的免费 AI 额度已用完，将在 ${hh}:${mm} 重置`;
+    return t('err.quota', { time: `${hh}:${mm}` });
   }
-  if (code === 'timeout') return '生成超时，网络较慢时请重试';
-  if (code === 'network') return '网络连接失败，请检查网络后重试';
-  if (code === 'origin not allowed') return '请通过 ffvoid.com/hairmagic 访问';
-  return 'AI 生成失败（' + (code || '未知错误') + '），请重试';
+  if (code === 'timeout') return t('err.timeout');
+  if (code === 'network') return t('err.network');
+  if (code === 'origin not allowed') return t('err.origin');
+  return t('err.generic', { code: code || t('err.unknown') });
 }
 
 // ---------------------------------------------------------------- 3DGS jobs

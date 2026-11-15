@@ -1,3 +1,4 @@
+import { t } from './i18n.js?v=202611150506';
 // On-device vision: MediaPipe face landmarks (478 pts + head pose) and hair segmentation.
 // MediaPipe is loaded lazily so the rest of the app works even if it cannot load on a device
 let MP = null;
@@ -181,7 +182,7 @@ export function faceShape(lm) {
   return 'oval';
 }
 
-export const FACE_SHAPE_ZH = { round: '圆脸', long: '长脸', square: '方脸', heart: '心形脸', oval: '鹅蛋脸' };
+export const faceShapeName = (k) => t('shape.' + k);
 
 /** Portrait crop rectangle (3:4) around the head with room for hair. */
 export function headCrop(face, w, h) {

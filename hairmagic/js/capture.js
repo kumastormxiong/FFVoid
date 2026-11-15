@@ -1,6 +1,7 @@
 // Guided head scan: live face mesh, pose targets with auto-shutter, and gallery import.
-import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, switchToCpu, visionDelegate, FACE_OVAL as OVAL } from './vision.js?v=202611101949';
-import { canvasOf, canvasToBlob } from './composite.js?v=202611101949';
+import { t } from './i18n.js?v=202611150506';
+import { getVideoLandmarker, detectFace, packFace, headCrop, loadVision, switchToCpu, visionDelegate, FACE_OVAL as OVAL } from './vision.js?v=202611150506';
+import { canvasOf, canvasToBlob } from './composite.js?v=202611150506';
 
 const DEBUG = /[?&]debug=1/.test(location.search);
 
@@ -20,14 +21,13 @@ function readMirror() {
 export const OUT_W = 768;
 export const OUT_H = 1024;
 
-export const STEPS = [
-  { key: 'front', zh: '正面', tip: '正对镜头，保持不动' },
-  { key: 'left', zh: '左侧', tip: '脸慢慢转向画面左边' },
-  { key: 'right', zh: '右侧', tip: '脸慢慢转向画面右边' },
-  { key: 'up', zh: '抬头', tip: '下巴微微抬起' },
-  { key: 'down', zh: '低头', tip: '下巴微微收低' },
-];
-export const ANGLE_ZH = { front: '正面', left: '左侧', right: '右侧', up: '抬头', down: '低头', other: '其他' };
+const mkStep = (key) => ({
+  key,
+  get zh() { return t('angle.' + key); },
+  get tip() { return t('step.' + key); },
+});
+export const STEPS = ['front', 'left', 'right', 'up', 'down'].map(mkStep);
+export const angleName = (a) => t('angle.' + (['front', 'left', 'right', 'up', 'down'].includes(a) ? a : 'other'));
 export const ANGLE_ORDER = { left: 0, up: 1, front: 2, down: 3, right: 4, other: 5 };
 
 /** Legacy 2D ratios (kept in stored photos for old data); the real pose is headPose(). */
@@ -86,22 +86,22 @@ export function stepScore(key, p, base = 0) {
 export function poseHint(key, p, base = 0) {
   const up = pitchUp(p, base);
   if (key === 'front') {
-    if (Math.abs(p.yaw) > 6) return '头摆正，正对镜头';
-    if (Math.abs(up) > 6) return '下巴放平，别抬也别低';
-    return '头摆正，眼睛看镜头';
+    if (Math.abs(p.yaw) > 6) return t('hint.front.yaw');
+    if (Math.abs(up) > 6) return t('hint.front.pitch');
+    return t('hint.front.eyes');
   }
   if (key === 'left' || key === 'right') {
     const v = key === 'left' ? -p.yaw : p.yaw;
-    if (v > 48) return '转过头了，回来一点';
-    if (Math.abs(up) > 12) return '下巴放平，只转头';
-    if (v < 24) return '再多转一点（约 30°）';
-    return '保持住…';
+    if (v > 48) return t('hint.side.over');
+    if (Math.abs(up) > 12) return t('hint.side.pitch');
+    if (v < 24) return t('hint.side.more');
+    return t('hint.hold');
   }
   const v = key === 'up' ? up : -up;
-  if (v > 35) return '幅度小一点就好';
-  if (Math.abs(p.yaw) > 12) return key === 'up' ? '脸朝前，只抬头' : '脸朝前，只低头';
-  if (v < 12) return key === 'up' ? '下巴再抬高一点' : '下巴再收低一点';
-  return '保持住…';
+  if (v > 35) return t('hint.ud.less');
+  if (Math.abs(p.yaw) > 12) return t(key === 'up' ? 'hint.up.face' : 'hint.down.face');
+  if (v < 12) return t(key === 'up' ? 'hint.up.more' : 'hint.down.more');
+  return t('hint.hold');
 }
 
 /**
@@ -492,7 +492,7 @@ export class GuidedCapture {
       fg.drawImage(v, 0, 0);
       const shot = await cropHead(frame, frame.width, frame.height);
       if (!shot) {
-        this.ui.onError && this.ui.onError('没有检测到人脸，请把脸放进取景框');
+        this.ui.onError && this.ui.onError(t('cap.noface.toast'));
         return;
       }
       let angle = key;

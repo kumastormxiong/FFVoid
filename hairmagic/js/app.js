@@ -1,16 +1,17 @@
 // HairMagic — app shell: state, studio, capture flow, archive.
-import * as store from './store.js?v=202611101949';
-import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace } from './styles.js?v=202611101949';
+import * as store from './store.js?v=202611150506';
+import { STYLES, COLORS, randomSeed, styleFromSeed, suggestForFace, colorName, colorByZh } from './styles.js?v=202611150506';
+import { t, tn, getLang, setLang, applyStatic, onLangChange } from './i18n.js?v=202611150506';
 import {
   NEEDS, LENGTH_PRESETS, SEED_LENGTH_NEEDS, GROWTH_CM_PER_MONTH,
-  monthsNeeded, gapDetail, describeLength, geometricEstimate,
-} from './length.js?v=202611101949';
-import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611101949';
-import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611101949';
-import { loadVision, detectFace, faceShape, FACE_SHAPE_ZH } from './vision.js?v=202611101949';
+  monthsNeeded, gapDetail, describeLength, lengthIndex, presetName, serviceName, geometricEstimate,
+} from './length.js?v=202611150506';
+import { generateLook, analyzeHair, errorText, createGsJob, gsJob, gsResult, gsStatus } from './api.js?v=202611150506';
+import { loadBitmap, toCanvas, canvasToBlob, identityLock } from './composite.js?v=202611150506';
+import { loadVision, detectFace, faceShape, faceShapeName } from './vision.js?v=202611150506';
 import {
-  GuidedCapture, STEPS, ANGLE_ZH, ANGLE_ORDER, cropHead, compactLandmarks, planAngles, fileToCanvas,
-} from './capture.js?v=202611101949';
+  GuidedCapture, STEPS, angleName, ANGLE_ORDER, cropHead, compactLandmarks, planAngles, fileToCanvas,
+} from './capture.js?v=202611150506';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -60,17 +61,32 @@ function toast(msg, ms = 2600) {
   clearTimeout(toastT);
   toastT = setTimeout(() => (t.hidden = true), ms);
 }
-const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 function dateLabel(d) {
-  if (d === store.today()) return '今天';
+  if (d === store.today()) return t('date.today');
   const [y, m, dd] = d.split('-').map(Number);
   const now = new Date();
-  return (y === now.getFullYear() ? '' : y + '年') + `${m}月${dd}日`;
+  if (getLang() === 'zh') return (y === now.getFullYear() ? '' : y + '年') + `${m}月${dd}日`;
+  return `${t('mon.' + m)} ${dd}` + (y === now.getFullYear() ? '' : `, ${y}`);
 }
 function weekday(d) {
   const [y, m, dd] = d.split('-').map(Number);
-  return WEEK[new Date(y, m - 1, dd).getDay()];
+  return t('wk.' + new Date(y, m - 1, dd).getDay());
 }
+
+// stored looks keep their Chinese label; derive the English one from the style / seed / colour
+function lookLabel(l) {
+  if (!l) return '';
+  if (getLang() === 'zh') return l.label || '';
+  if (l.labelEn) return l.labelEn;
+  const col = l.color ? colorByZh(l.color) : null;
+  if (l.styleId) {
+    const st = STYLES.find((x) => x.id === l.styleId);
+    if (st) return st.en + (col ? ' · ' + col.en : '');
+  }
+  if (l.kind === 'seed' && l.seed != null) return t('seed.name', { n: String(l.seed).padStart(6, '0') });
+  return l.label || '';
+}
+const fileSafe = (x) => (x || 'look').replace(/[^\w一-龥#-]+/g, '_');
 const cm = (v) => (v < 10 ? (Math.round(v * 2) / 2).toString() : Math.round(v).toString());
 const orderPhotos = (arr) => [...arr].sort((a, b) => (ANGLE_ORDER[a.angle] ?? 9) - (ANGLE_ORDER[b.angle] ?? 9));
 
@@ -133,12 +149,12 @@ async function ensureHairLength() {
 function renderLen() {
   const el = $('#hairLenValue');
   if (!S.len) {
-    el.innerHTML = S.photos.length ? '正在估算…' : '拍照后自动估算';
+    el.textContent = S.photos.length ? t('len.estimating') : t('len.after');
     return;
   }
   const l = S.len;
-  const rough = l.source === 'geometry' || l.source === 'default' ? ' · 粗估，点右侧校准' : '';
-  el.innerHTML = `${describeLength(l)} <small>顶 ${cm(l.top)} · 侧 ${cm(l.side)} · 后 ${cm(l.back)} cm${rough}</small>`;
+  const rough = l.source === 'geometry' || l.source === 'default' ? t('len.rough') : '';
+  el.innerHTML = `${describeLength(l)} <small>${t('len.detail', { t: cm(l.top), s: cm(l.side), b: cm(l.back) })}${rough}</small>`;
 }
 
 // ---------------------------------------------------------------- data loading
@@ -204,7 +220,7 @@ function renderAngles() {
     b.setAttribute('aria-selected', p.id === S.sel);
     b.dataset.id = p.id;
     const look = currentLook(p.id);
-    b.innerHTML = `<img alt="" src="${urlFor(look || p)}"><span class="angle-name">${ANGLE_ZH[p.angle] || '其他'}</span>${look ? '<span class="angle-dot"></span>' : ''}`;
+    b.innerHTML = `<img alt="" src="${urlFor(look || p)}"><span class="angle-name">${angleName(p.angle)}</span>${look ? '<span class="angle-dot"></span>' : ''}`;
     b.onclick = () => selectPhoto(p.id);
     box.appendChild(b);
   }
@@ -212,7 +228,7 @@ function renderAngles() {
   if (S.photos.length < 5) {
     const add = document.createElement('button');
     add.className = 'angle angle-add';
-    add.setAttribute('aria-label', '补拍角度');
+    add.setAttribute('aria-label', t('angles.add'));
     add.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
     add.onclick = () => openCapture();
     box.appendChild(add);
@@ -238,14 +254,14 @@ function renderStage() {
   } else {
     wrap.hidden = true;
   }
-  $('#stageAngle').textContent = ANGLE_ZH[p.angle] || '其他';
+  $('#stageAngle').textContent = angleName(p.angle);
   const info = $('#stageInfo');
   if (look) {
     info.hidden = false;
-    info.textContent = look.label + (look.seed && look.kind === 'seed' ? ` · #${look.seed}` : '');
+    info.textContent = lookLabel(look) + (look.seed && look.kind === 'seed' && !lookLabel(look).includes('#') ? ` · #${look.seed}` : '');
   } else info.hidden = true;
   $('#btnSave').hidden = !look;
-  $('#btn3d').hidden = !look;
+  $('#btn3d').hidden = !(look || S.set === null); // original photos can be turned into a 3D head too
   $('#btnCompare').hidden = !look;
   if (!look && S.compare) setCompare(false);
   applyCompare();
@@ -267,21 +283,21 @@ function applyCompare() {
 function renderLooks() {
   const sets = lookSets();
   $('#looksRow').hidden = !sets.length;
-  $('#looksCount').textContent = sets.length ? `${sets.length} 组` : '';
+  $('#looksCount').textContent = sets.length ? t('looks.count', { n: sets.length }) : '';
   const rail = $('#looksRail');
   rail.innerHTML = '';
   // "original" chip first
   const orig = document.createElement('button');
   orig.className = 'look' + (S.set === null ? ' is-on' : '');
   const p0 = S.photos.find((p) => p.id === S.sel) || S.photos[0];
-  orig.innerHTML = `<div class="look-img"><img alt="" src="${urlFor(p0)}"></div><div class="look-name">原图</div>`;
+  orig.innerHTML = `<div class="look-img"><img alt="" src="${urlFor(p0)}"></div><div class="look-name">${t('looks.original')}</div>`;
   orig.onclick = () => { S.set = null; renderLooks(); renderAngles(); renderStage(); };
   rail.appendChild(orig);
   for (const s of sets) {
     const b = document.createElement('button');
     b.className = 'look' + (s.setId === S.set ? ' is-on' : '');
     const cover = s.items.find((l) => l.photoId === S.sel) || s.items[0];
-    b.innerHTML = `<div class="look-img"><img alt="" src="${urlFor(cover)}"></div>${s.items.length > 1 ? `<span class="look-count">${s.items.length} 角度</span>` : ''}<div class="look-name">${s.label}</div>`;
+    b.innerHTML = `<div class="look-img"><img alt="" src="${urlFor(cover)}"></div>${s.items.length > 1 ? `<span class="look-count">${t('looks.angles', { n: s.items.length })}</span>` : ''}<div class="look-name">${lookLabel(s.items[0])}</div>`;
     b.onclick = () => {
       S.set = s.setId;
       if (!s.items.find((l) => l.photoId === S.sel)) S.sel = s.items[0].photoId;
@@ -298,7 +314,7 @@ function renderLooks() {
 }
 
 async function removeSet(s) {
-  if (!confirm(`删除造型「${s.label}」？`)) return;
+  if (!confirm(t('looks.delete', { name: lookLabel(s.items[0]) }))) return;
   await store.deleteLookSet(s.setId, S.date);
   S.looks = await store.looksByDate(S.date);
   if (S.set === s.setId) S.set = (lookSets()[0] || {}).setId || null;
@@ -347,10 +363,10 @@ function renderStyles() {
 
   const note = $('#stylesNote');
   const lenTxt = S.len ? describeLength(S.len) : '';
-  const shapeTxt = S.shape ? `，${FACE_SHAPE_ZH[S.shape]}推荐款标 ★` : '';
+  const shapeTxt = S.shape ? t('note.shape', { shape: faceShapeName(S.shape) }) : '';
   note.textContent = S.mode === 'now'
-    ? (S.len ? `按你现在的发长（${lenTxt}），${S.line === 'f' ? '女士' : '男士'}发型里这 ${nowCount} 款现在就能剪${shapeTxt}。` : '正在估算你的发长…')
-    : `需要留长的发型会标出大约要留几个月（按每月 ${GROWTH_CM_PER_MONTH} cm）。`;
+    ? (S.len ? t('note.now', { len: lenTxt, line: t(S.line === 'f' ? 'line.f.short' : 'line.m.short'), n: nowCount, shape: shapeTxt }) : t('note.estimating'))
+    : t('note.all', { g: GROWTH_CM_PER_MONTH });
 
   const grid = $('#styleGrid');
   grid.innerHTML = '';
@@ -360,21 +376,21 @@ function renderStyles() {
     b.dataset.id = s.id;
     const svc = NEEDS[s.id].service;
     const meta = months
-      ? `<div class="style-meta is-grow">需留发约 ${months} 个月</div>`
-      : `<div class="style-meta is-ok">${svc ? '现在可做 · 需' + svc : '现在可剪'}</div>`;
-    b.innerHTML = `<div class="style-img"><img loading="lazy" alt="" src="./assets/styles/${s.id}.jpg" onerror="this.parentNode.classList.add('is-missing');this.remove()"><span class="style-ph">${s.en}</span></div>${r ? '<span class="badge-rec">★ 推荐</span>' : ''}<div class="style-body"><div class="style-name">${s.zh}</div>${meta}</div>`;
+      ? `<div class="style-meta is-grow">${t('meta.grow', { n: months })}</div>`
+      : `<div class="style-meta is-ok">${svc ? t('meta.ok.svc', { svc: serviceName(svc) }) : t('meta.ok')}</div>`;
+    b.innerHTML = `<div class="style-img"><img loading="lazy" alt="" src="./assets/styles/${s.id}.jpg" onerror="this.parentNode.classList.add('is-missing');this.remove()"><span class="style-ph">${s.en}</span></div>${r ? `<span class="badge-rec">${t('badge.rec')}</span>` : ''}<div class="style-body"><div class="style-name">${getLang() === 'zh' ? s.zh : s.en}</div>${meta}</div>`;
     b.onclick = () => {
       S.styleId = s.id;
       $$('.style', grid).forEach((x) => x.classList.toggle('is-on', x.dataset.id === s.id));
       renderSummary();
       if (months) {
         const g = gapDetail(NEEDS[s.id], S.len);
-        toast(`${s.zh}：${g.zh}需要约 ${cm(g.need)} cm，你现在约 ${cm(g.cur)} cm，预计留发 ${months} 个月`, 4200);
+        toast(t('toast.grow', { name: getLang() === 'zh' ? s.zh : s.en, zone: g.zone, need: cm(g.need), cur: cm(g.cur), n: months }), 4200);
       }
     };
     grid.appendChild(b);
   }
-  if (!list.length) grid.innerHTML = '<p class="mode-note">没有匹配的发型，试试“全部 50 款”。</p>';
+  if (!list.length) grid.innerHTML = `<p class="mode-note">${t('note.none')}</p>`;
 }
 
 function allowedSeedLengths() {
@@ -387,15 +403,17 @@ function currentSeedStyle() {
   return styleFromSeed(S.seed, { randomColor: S.seedColor, allowedLengths: allowedSeedLengths(), line: S.line });
 }
 
+const seedName = (st) => (getLang() === 'zh' ? st.zh : st.en);
+
 function renderSeed() {
   const input = $('#seedInput');
   if (document.activeElement !== input) input.value = String(S.seed).padStart(6, '0');
   const st = currentSeedStyle();
-  $('#seedDesc').textContent = st.zh + (st.color ? ` · ${st.color.zh}` : '');
+  $('#seedDesc').textContent = seedName(st) + (st.color ? ` · ${colorName(st.color)}` : '');
   const months = S.len ? monthsNeeded(SEED_LENGTH_NEEDS[st.lengthIdx], S.len) : 0;
   const g = $('#seedGrow');
   g.classList.toggle('is-grow', months > 0);
-  g.textContent = months ? `这个长度需要留发约 ${months} 个月` : '现在就能剪出这个长度';
+  g.textContent = months ? t('seed.needs', { n: months }) : t('seed.ok');
   $('#colorsBlock').hidden = S.seedColor;
   renderSummary();
 }
@@ -408,7 +426,7 @@ function renderColors() {
     b.className = 'color' + (c.id === 'keep' ? ' keep' : '') + (c.id === S.colorId ? ' is-on' : '');
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-checked', c.id === S.colorId);
-    b.setAttribute('aria-label', c.zh);
+    b.setAttribute('aria-label', c.id === 'keep' ? t('color.keep') : colorName(c));
     if (c.hex) b.style.background = c.hex;
     b.onclick = () => {
       S.colorId = c.id;
@@ -418,7 +436,7 @@ function renderColors() {
     };
     box.appendChild(b);
   }
-  $('#colorName').textContent = COLORS.find((c) => c.id === S.colorId).zh;
+  { const cc = COLORS.find((c) => c.id === S.colorId); $('#colorName').textContent = cc.id === 'keep' ? t('color.keep') : colorName(cc); }
 }
 
 function renderOptions() {
@@ -437,7 +455,8 @@ function recipe() {
     return {
       kind: 'seed',
       label: `种子 #${String(S.seed).padStart(6, '0')}`,
-      sub: st.zh,
+      labelEn: `Seed #${String(S.seed).padStart(6, '0')}`,
+      sub: seedName(st),
       hair: st.prompt,
       color: col ? col.prompt : '',
       colorZh: col ? col.zh : '',
@@ -450,6 +469,7 @@ function recipe() {
     kind: 'preset',
     styleId: s.id,
     label: s.zh + (color.prompt ? ' · ' + color.zh : ''),
+    labelEn: s.en + (color.prompt ? ' · ' + color.en : ''),
     sub: s.en,
     hair: s.prompt,
     color: color.prompt,
@@ -463,11 +483,12 @@ function renderSummary() {
   if (!S.photos.length) return;
   const r = recipe();
   const n = S.scope === 'all' ? S.photos.length : 1;
-  const tail = r.months ? `<span class="grow">需留发约 ${r.months} 个月</span>` : '现在可剪';
-  $('#genSummary').innerHTML = `<b>${r.kind === 'seed' ? r.sub : r.label}</b>${tail} · ${n} 张 · ${S.quality === 'hd' ? '高清' : '极速'}`;
+  const tail = r.months ? `<span class="grow">${t('meta.grow', { n: r.months })}</span>` : t('meta.ok');
+  const nm = r.kind === 'seed' ? r.sub : getLang() === 'zh' ? r.label : r.labelEn;
+  $('#genSummary').innerHTML = `<b>${nm}</b>${tail} · ${tn('gen.photos', n)} · ${t(S.quality === 'hd' ? 'opt.quality.hd' : 'opt.quality.fast')}`;
   const btn = $('#btnGenerate');
   btn.disabled = S.busy;
-  btn.textContent = S.busy ? '生成中…' : '生成造型';
+  btn.textContent = S.busy ? t('gen.busy') : t('gen.btn');
 }
 
 // ---------------------------------------------------------------- generation
@@ -536,7 +557,7 @@ async function generate() {
       renderStage();
       startScan(p);
       $$('.angle').forEach((a) => a.classList.toggle('is-busy', a.dataset.id === p.id));
-      progText.textContent = targets.length > 1 ? `正在生成 ${i + 1}/${targets.length} · ${ANGLE_ZH[p.angle]}` : '正在生成新发型…';
+      progText.textContent = targets.length > 1 ? t('gen.progress.multi', { i: i + 1, n: targets.length, angle: angleName(p.angle) }) : t('gen.progress.one');
       const input = quality === 'hd' ? p.blob : await resizeBlob(p.blob, 384, 512, 0.9);
       let out;
       try {
@@ -544,13 +565,13 @@ async function generate() {
       } catch (e) {
         if (quality === 'hd' && e.code === 'quota') {
           quality = 'fast';
-          toast('高清额度用完了，自动改用极速模式');
+          toast(t('gen.hdquota'));
           out = await generateLook({ image: await resizeBlob(p.blob, 384, 512), ref: refBlob, hair: r.hair, color: r.color, seed: r.seed, quality });
         } else throw e;
       }
       let blob = out.blob;
       if (S.lock) {
-        progText.textContent = '原貌锁定：对齐五官…';
+        progText.textContent = t('gen.lock');
         try {
           const res = await identityLock(p.blob, blob);
           blob = res.blob;
@@ -561,7 +582,7 @@ async function generate() {
       if (i === 0 && targets.length > 1) refBlob = await resizeBlob(blob, 384, 512, 0.9);
       await store.addLook({
         date: S.date, photoId: p.id, setId, kind: r.kind, styleId: r.styleId || null, label: r.label,
-        sub: r.sub, color: r.colorZh, seed: r.seed, quality, months: r.months, blob,
+        sub: r.sub, labelEn: r.labelEn, color: r.colorZh, seed: r.seed, quality, months: r.months, blob,
       });
       made++;
       S.looks = await store.looksByDate(S.date);
@@ -571,7 +592,7 @@ async function generate() {
       renderStage();
     }
     const secs = Math.round((Date.now() - t0) / 1000);
-    toast(`已生成 ${made} 张 · ${secs} 秒${r.months ? ` · 这个发型需留发约 ${r.months} 个月` : ''}`);
+    toast(t('gen.done', { n: made, s: secs }) + (r.months ? t('gen.done.grow', { m: r.months }) : ''));
   } catch (e) {
     console.error(e);
     toast(errorText(e), 4200);
@@ -590,7 +611,7 @@ async function generate() {
 async function saveCurrent() {
   const look = currentLook();
   if (!look) return;
-  const name = `hairmagic-${look.date}-${(look.label || 'look').replace(/[^\w一-龥#-]+/g, '_')}.jpg`;
+  const name = `hairmagic-${look.date}-${fileSafe(lookLabel(look))}.jpg`;
   const file = new File([look.blob], name, { type: 'image/jpeg' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
@@ -646,12 +667,15 @@ function bindStage() {
 
 // ---------------------------------------------------------------- capture overlay
 let cap = null;
+let lastSt = null;
+let capFailed = null;
 async function openCapture(retake = false) {
   const ov = $('#capture');
   ov.hidden = false;
   document.body.style.overflow = 'hidden';
-  $('#capTip').textContent = '正在启动摄像头…';
-  $('#capSub').textContent = '首次使用需要加载人脸模型';
+  lastSt = null;
+  $('#capTip').textContent = t('cap.starting');
+  $('#capSub').textContent = t('cap.loading');
   const existing = new Set((await store.photosByDate(store.today())).map((p) => p.angle));
   if (S.date !== store.today()) await loadDate(store.today());
   cap = new GuidedCapture({
@@ -682,8 +706,9 @@ async function openCapture(retake = false) {
     await cap.start();
   } catch (e) {
     console.error(e);
-    $('#capTip').textContent = '无法打开摄像头';
-    $('#capSub').textContent = e.name === 'NotAllowedError' ? '请在浏览器设置里允许使用相机，或用左下角从相册导入' : '可以用左下角从相册导入照片';
+    capFailed = e.name === 'NotAllowedError' ? 'cap.fail.denied' : 'cap.fail.other';
+    $('#capTip').textContent = t('cap.fail');
+    $('#capSub').textContent = t(capFailed);
   }
 }
 
@@ -700,20 +725,22 @@ async function savePhoto(shot, angle) {
 }
 
 function updateCapTip(st) {
+  lastSt = st;
+  capFailed = null;
   const step = cap && cap.current;
   const tip = $('#capTip'), sub = $('#capSub');
   if (!step) {
-    tip.textContent = '全部角度已拍好';
-    sub.textContent = '点“完成”开始换发型';
+    tip.textContent = t('cap.alldone');
+    sub.textContent = t('cap.alldone.sub');
     return;
   }
   tip.textContent = step.tip;
-  if (!st.face) sub.textContent = '把整张脸放进画面中间';
-  else if (st.fit === 'near') sub.textContent = '太近了，手机拿远一点';
-  else if (st.fit === 'far') sub.textContent = '太远了，靠近一点';
-  else if (st.fit === 'edge') sub.textContent = '头别出画面，往中间挪一点';
-  else if (st.fit === 'top') sub.textContent = '头顶要完整入画，手机放低一点或退后';
-  else if (st.score >= 0.98) sub.textContent = '保持住…';
+  if (!st.face) sub.textContent = t('cap.noface');
+  else if (st.fit === 'near') sub.textContent = t('cap.near');
+  else if (st.fit === 'far') sub.textContent = t('cap.far');
+  else if (st.fit === 'edge') sub.textContent = t('cap.edge');
+  else if (st.fit === 'top') sub.textContent = t('cap.top');
+  else if (st.score >= 0.98) sub.textContent = t('hint.hold');
   else sub.textContent = st.hint || '';
 }
 
@@ -726,13 +753,13 @@ function renderCapSteps() {
     if (p && cap && cap.retake && !cap.done.has(s.key)) p = null; // old photo, not retaken yet
     const li = document.createElement('li');
     li.className = 'cap-step' + (p ? ' is-done' : '') + (cur && cur.key === s.key ? ' is-current' : '');
-    li.innerHTML = `<div class="thumb">${p ? `<img alt="" src="${urlFor(p)}">` : ''}</div>${s.zh}${s.key === 'up' || s.key === 'down' ? '<span class="opt-tag">可选</span>' : ''}`;
+    li.innerHTML = `<div class="thumb">${p ? `<img alt="" src="${urlFor(p)}">` : ''}</div>${angleName(s.key)}${s.key === 'up' || s.key === 'down' ? `<span class="opt-tag">${t('cap.optional')}</span>` : ''}`;
     ol.appendChild(li);
   }
   const n = cap && cap.retake ? cap.done.size : S.photos.filter((p) => p.date === store.today()).length;
   const need = cap && cap.retake ? 1 : 3;
   $('#capDone').disabled = n < need;
-  $('#capDone').textContent = n < need ? `${n}/${need}` : '完成';
+  $('#capDone').textContent = n < need ? `${n}/${need}` : t('cap.done');
 }
 
 function setupMirrorButton() {
@@ -745,7 +772,7 @@ function setupMirrorButton() {
     $('.cap-top').appendChild(b);
   }
   const sync = () => {
-    b.textContent = cap && cap.mirror ? '镜像 开' : '镜像 关';
+    b.textContent = cap && cap.mirror ? t('cap.mirror.on') : t('cap.mirror.off');
     b.setAttribute('aria-pressed', cap && cap.mirror ? 'true' : 'false');
   };
   b.onclick = () => {
@@ -757,7 +784,7 @@ function setupMirrorButton() {
 }
 
 function retakeToday() {
-  if (!confirm('重拍会用新照片替换今天的原始照片，用被替换照片生成的造型也会一并清除。继续吗？')) return;
+  if (!confirm(t('retake.confirm'))) return;
   openCapture(true);
 }
 
@@ -773,7 +800,7 @@ function closeCapture() {
 async function importFiles(files, fromCapture) {
   if (!files || !files.length) return;
   const list = [...files].slice(0, 5);
-  toast('正在识别人脸…', 8000);
+  toast(t('imp.detect'), 8000);
   await loadVision();
   const used = new Set();
   let ok = 0;
@@ -797,8 +824,8 @@ async function importFiles(files, fromCapture) {
   const noFace = list.length - shots.length;
   const dup = shots.length - plan.length;
   toast(ok
-    ? `已导入 ${ok} 张` + (dup ? `，${dup} 张角度重复已跳过` : '') + (noFace ? `，${noFace} 张没识别到人脸` : '')
-    : '没有在照片里找到清晰的人脸（侧脸别超过约 50°）');
+    ? t('imp.ok', { n: ok }) + (dup ? t('imp.dup', { n: dup }) : '') + (noFace ? t('imp.noface', { n: noFace }) : '')
+    : t('imp.none'));
   if (fromCapture && cap) {
     used.forEach((a) => cap.done.add(a));
     renderCapSteps();
@@ -827,15 +854,15 @@ function openLenSheet() {
   set('Side', l.side);
   set('Back', l.back);
   $('#lenSource').textContent =
-    l.source === 'vlm' ? 'AI 根据正面照估算的发长，可以手动修正，发型推荐会跟着变。'
-      : l.source === 'manual' ? '这是你手动设置的发长。'
-      : '根据照片几何估算，误差可能较大，建议手动修正。';
+    l.source === 'vlm' ? t('len.src.vlm')
+      : l.source === 'manual' ? t('len.src.manual')
+      : t('len.src.geo');
   const pres = $('#lenPresets');
   pres.innerHTML = '';
   LENGTH_PRESETS.forEach((p) => {
     const b = document.createElement('button');
-    b.textContent = p.zh;
-    b.className = describeLength(l) === p.zh ? 'is-on' : '';
+    b.textContent = presetName(p);
+    b.className = lengthIndex(l) === p.id ? 'is-on' : '';
     b.onclick = () => {
       set('Top', p.top);
       set('Side', p.side);
@@ -864,7 +891,7 @@ async function openDateSheet() {
   for (const d of dates) {
     const b = document.createElement('button');
     b.className = 'date-row' + (d.date === S.date ? ' is-on' : '');
-    b.innerHTML = `<b>${dateLabel(d.date)} <small>${weekday(d.date)}</small></b><span>${d.photos.length} 张头像 · ${new Set(d.looks.map((l) => l.setId)).size} 组造型</span>`;
+    b.innerHTML = `<b>${dateLabel(d.date)} <small>${weekday(d.date)}</small></b><span>${t('dates.stats', { p: d.photos.length, s: new Set(d.looks.map((l) => l.setId)).size })}</span>`;
     b.onclick = () => {
       closeSheets();
       go('studio');
@@ -881,7 +908,7 @@ async function renderArchive() {
   const dates = await store.listDates();
   box.innerHTML = '';
   if (!dates.length) {
-    box.innerHTML = '<div class="archive-empty">还没有记录。点下方“扫描”拍下今天的头像。</div>';
+    box.innerHTML = `<div class="archive-empty">${t('archive.empty')}</div>`;
     return;
   }
   for (const d of dates) {
@@ -891,13 +918,13 @@ async function renderArchive() {
     card.className = 'day';
     const [y, m, dd] = d.date.split('-');
     card.innerHTML = `
-      <div class="day-head"><div class="day-date">${y}.${m}.${dd}<small>${weekday(d.date)}${d.date === store.today() ? ' · 今天' : ''}</small></div>
-      <div class="day-stats">${d.photos.length} 张头像 · ${sets.size} 组造型</div></div>
+      <div class="day-head"><div class="day-date">${y}.${m}.${dd}<small>${weekday(d.date)}${d.date === store.today() ? ' · ' + t('date.today') : ''}</small></div>
+      <div class="day-stats">${t('archive.stats', { p: d.photos.length, s: sets.size })}</div></div>
       <div class="day-strip">${orderPhotos(d.photos).map((p) => `<img alt="" src="${urlForArchive(p)}">`).join('')}${sets.size ? '<span class="sep"></span>' : ''}${[...sets.values()].slice(0, 12).map((l) => `<img alt="" src="${urlForArchive(l)}">`).join('')}</div>
-      <div class="day-actions"><button class="btn btn-ink" data-a="open">打开</button><button class="btn btn-ghost" data-a="del">删除这天</button></div>`;
+      <div class="day-actions"><button class="btn btn-ink" data-a="open">${t('archive.open')}</button><button class="btn btn-ghost" data-a="del">${t('archive.del')}</button></div>`;
     card.querySelector('[data-a=open]').onclick = () => { go('studio'); loadDate(d.date); };
     card.querySelector('[data-a=del]').onclick = async () => {
-      if (!confirm(`删除 ${d.date} 的全部头像和造型？此操作不可撤销。`)) return;
+      if (!confirm(t('archive.del.confirm', { date: d.date }))) return;
       await store.deleteDate(d.date);
       store.prefs.set('len.' + d.date, null);
       if (d.date === S.date) await loadDate(store.today());
@@ -922,7 +949,33 @@ const setItems = () => S.looks.filter((l) => l.setId === S.set);
 const photoOf = (id) => S.photos.find((p) => p.id === id);
 const ANGLE_RANK = { front: 0, left: 1, right: 2, up: 3, down: 4, other: 5 };
 
+// "Original" chip selected (S.set === null): train from the captured photos themselves,
+// otherwise from the generated looks of the active set. Front photo always goes first.
+const isOrig = () => S.set === null;
+const rankOf = (angle) => ANGLE_RANK[angle || 'other'] ?? 9;
+
+function gsSource() {
+  if (isOrig()) {
+    return [...S.photos]
+      .sort((a, b) => rankOf(a.angle) - rankOf(b.angle))
+      .map((p) => ({ blob: p.blob, angle: p.angle || 'other', yawG: p.yawG ?? null }));
+  }
+  return setItems()
+    .map((l) => {
+      const p = photoOf(l.photoId) || {};
+      return { blob: l.blob, angle: p.angle || 'other', yawG: p.yawG ?? null };
+    })
+    .sort((a, b) => rankOf(a.angle) - rankOf(b.angle));
+}
+
 function gsHolder() {
+  if (isOrig()) {
+    return (
+      S.photos.find((p) => p.gsBlob || p.gsJob) ||
+      S.photos.find((p) => p.angle === 'front') ||
+      S.photos[0] || null
+    );
+  }
   const items = setItems();
   return (
     items.find((l) => l.gsBlob || l.gsJob) ||
@@ -931,10 +984,14 @@ function gsHolder() {
   );
 }
 
+// a holder is either a look (has setId) or an original photo record
+const saveHolder = (h) => (h.setId ? store.updateLook(h) : store.updatePhoto(h));
+const holderLabel = (h) => (!h ? '' : h.setId ? lookLabel(h) : t('v3.title.orig'));
+
 function v3State(state, text = '', sub = '') {
   const ov = $('#viewer3d');
   ov.dataset.state = state;
-  $('#v3Train').textContent = state === 'error' ? '重新训练' : '开始训练 3D 头像';
+  $('#v3Train').textContent = t(state === 'error' ? 'v3.retrain' : 'v3.train');
   $('#v3Status').textContent = text;
   $('#v3Sub').textContent = sub;
 }
@@ -945,18 +1002,19 @@ async function open3D() {
   v3Holder = h;
   $('#viewer3d').hidden = false;
   document.body.style.overflow = 'hidden';
-  $('#v3Title').textContent = h.label || '3D 发型';
+  $('#v3Title').textContent = holderLabel(h) || t('v3.title');
   if (h.gsBlob) return showSplat(h.gsBlob);
   if (h.gsJob) return pollJob();
-  const n = setItems().length;
+  return open3DIntro();
+}
+
+async function open3DIntro() {
+  const n = Math.min(5, gsSource().length);
   const st = await gsStatus();
   v3State(
     'intro',
-    n > 1 ? `用这组 ${n} 个角度训练 3D 头像` : '用这 1 张照片生成 3D 头像',
-    (n > 1
-      ? '先用人头先验（LAM）把正面照变成 3D 高斯点，再用其他角度做多视角训练。'
-      : '只有一个角度时主要依赖人头先验，后脑勺是推测的。先用「全部角度」生成能训练得更准。') +
-      (st.worker_online ? ' 训练节点在线，约 1–3 分钟。' : ' 训练节点目前离线：任务会排队，等你的电脑开机运行训练节点后自动开始。')
+    n > 1 ? t('v3.intro.n', { n }) : t('v3.intro.1'),
+    t(n > 1 ? 'v3.intro.sub.n' : 'v3.intro.sub.1') + t(st.worker_online ? 'v3.worker.on' : 'v3.worker.off')
   );
 }
 
@@ -971,28 +1029,28 @@ function close3D() {
 }
 
 async function start3DJob() {
-  const items = setItems().sort(
-    (a, b) => (ANGLE_RANK[(photoOf(a.photoId) || {}).angle] ?? 9) - (ANGLE_RANK[(photoOf(b.photoId) || {}).angle] ?? 9)
-  );
+  const items = gsSource().slice(0, 5);
   if (!items.length) return;
-  v3State('training', '正在上传照片…', '');
+  const label = isOrig() ? t('looks.original') : (setItems()[0] || {}).label || '';
+  v3State('training', t('v3.uploading'), '');
   try {
-    const views = await Promise.all(items.slice(0, 5).map((l) => resizeBlob(l.blob, 768, 1024, 0.9)));
+    const views = await Promise.all(items.map((it) => resizeBlob(it.blob, 768, 1024, 0.9)));
     const meta = {
-      angles: items.slice(0, 5).map((l) => (photoOf(l.photoId) || {}).angle || 'other'),
-      yaw: items.slice(0, 5).map((l) => (photoOf(l.photoId) || {}).yawG ?? null),
-      label: items[0].label,
+      angles: items.map((it) => it.angle),
+      yaw: items.map((it) => it.yawG),
+      label,
+      source: isOrig() ? 'original' : 'look',
       date: S.date,
     };
-    const { id } = await createGsJob({ views, meta, label: items[0].label });
+    const { id } = await createGsJob({ views, meta, label });
     const h = gsHolder();
     h.gsJob = id;
-    await store.updateLook(h);
+    await saveHolder(h);
     v3Holder = h;
     pollJob();
   } catch (e) {
     console.error(e);
-    v3State('error', e.code === 'queue_full' ? '训练队列已满，请稍后再试' : '上传失败', errorText(e));
+    v3State('error', e.code === 'queue_full' ? t('v3.queuefull') : t('v3.uploadfail'), errorText(e));
   }
 }
 
@@ -1011,22 +1069,22 @@ async function pollJob() {
   } catch (e) {
     if (e.code === 'job_missing') {
       delete h.gsJob;
-      await store.updateLook(h);
-      v3State('error', '训练任务已过期', '重新开始训练即可');
+      await saveHolder(h);
+      v3State('error', t('v3.expired'), t('v3.expired.sub'));
       return;
     }
     pollT = setTimeout(pollJob, 5000);
     return;
   }
   if (j.status === 'done') {
-    v3State('training', '训练完成，正在下载 3D 模型…', '');
+    v3State('training', t('v3.downloading'), '');
     try {
       const blob = await gsResult(h.gsJob);
       h.gsBlob = blob;
       h.gsAt = Date.now();
       delete h.gsJob;
-      await store.updateLook(h);
-      S.looks = await store.looksByDate(S.date);
+      await saveHolder(h);
+      if (h.setId) S.looks = await store.looksByDate(S.date);
       return showSplat(blob);
     } catch (e) {
       pollT = setTimeout(pollJob, 4000);
@@ -1035,34 +1093,34 @@ async function pollJob() {
   }
   if (j.status === 'error') {
     delete h.gsJob;
-    await store.updateLook(h);
-    v3State('error', '3D 训练失败', j.error || '请重试');
+    await saveHolder(h);
+    v3State('error', t('v3.failed'), j.error || t('v3.retry'));
     return;
   }
   const pct = Math.round((j.progress || 0) * 100);
   if (j.status === 'queued') {
     v3State(
       'training',
-      j.worker_online ? (j.ahead ? `排队中，前面还有 ${j.ahead} 个任务` : '训练节点即将开始…') : '已排队，等待训练节点上线',
-      j.worker_online ? '' : '训练节点是你电脑上的 GPU 程序，开机并运行后会自动接单。可以先关闭这个页面，稍后回来查看。'
+      j.worker_online ? (j.ahead ? t('v3.queue.ahead', { n: j.ahead }) : t('v3.queue.soon')) : t('v3.queue.wait'),
+      j.worker_online ? '' : t('v3.queue.sub')
     );
   } else {
-    v3State('training', STAGE_ZH(j.stage) || '训练中…', `${pct}%`);
+    v3State('training', STAGE_ZH(j.stage) || t('v3.training'), `${pct}%`);
   }
   $('#v3Bar').style.width = pct + '%';
   pollT = setTimeout(pollJob, 2500);
 }
 
 async function showSplat(blob) {
-  v3State('loading', '正在载入 3D 模型…', '');
+  v3State('loading', t('v3.loading'), '');
   try {
-    const { SplatViewer } = await import('./gs3d.js?v=202611101949');
+    const { SplatViewer } = await import('./gs3d.js?v=202611150506');
     if (!viewer) viewer = new SplatViewer($('#v3Canvas'));
     const info = await viewer.load(await blob.arrayBuffer());
-    v3State('view', '', `${(info.count / 1000).toFixed(1)}k 个高斯点`);
+    v3State('view', '', t('v3.points', { n: (info.count / 1000).toFixed(1) }));
   } catch (e) {
     console.error(e);
-    v3State('error', '3D 模型载入失败', '这台设备可能不支持 WebGL2');
+    v3State('error', t('v3.loadfail'), t('v3.loadfail.sub'));
   }
 }
 
@@ -1071,7 +1129,7 @@ function save3D() {
   if (!h || !h.gsBlob) return;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(h.gsBlob);
-  a.download = `hairmagic-${h.date}-${(h.label || 'look').replace(/[^\w一-龥#-]+/g, '_')}.ply`;
+  a.download = `hairmagic-${h.date}-${fileSafe(holderLabel(h))}.ply`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -1103,6 +1161,8 @@ function bind() {
   $('#capDone').onclick = closeCapture;
   $('#capShutter').onclick = () => cap && cap.running && cap.shoot(cap.current ? cap.current.key : 'front', true);
   $('#dateChip').onclick = openDateSheet;
+  $('#langChip').onclick = () => setLang(getLang() === 'zh' ? 'en' : 'zh');
+  onLangChange(refreshLang);
   $('#sheetScrim').onclick = closeSheets;
   $('#hairLen').onclick = openLenSheet;
   ['Top', 'Side', 'Back'].forEach((k) =>
@@ -1117,7 +1177,7 @@ function bind() {
     closeSheets();
     store.prefs.set('len.' + S.date, null);
     await ensureHairLength();
-    toast('已重新估算发长');
+    toast(t('len.reanalyzed'));
   };
   $$('.seg-btn').forEach((b) => (b.onclick = () => { S.mode = b.dataset.mode; renderMode(); renderSummary(); }));
   $$('.line-btn').forEach((b) => (b.onclick = () => {
@@ -1167,8 +1227,28 @@ function bind() {
   });
 }
 
+function refreshLang() {
+  $('#dateLabel').textContent = dateLabel(S.date);
+  if (S.photos.length) renderStudio();
+  if (S.view === 'archive') renderArchive();
+  if (cap) {
+    renderCapSteps();
+    setupMirrorButton();
+    if (lastSt) updateCapTip(lastSt);
+    else if (capFailed) { $('#capTip').textContent = t('cap.fail'); $('#capSub').textContent = t(capFailed); }
+    else { $('#capTip').textContent = t('cap.starting'); $('#capSub').textContent = t('cap.loading'); }
+  }
+  if (!$('#sheetLen').hidden) openLenSheet();
+  if (!$('#sheetDates').hidden) openDateSheet();
+  if (!$('#viewer3d').hidden && v3Holder) $('#v3Title').textContent = holderLabel(v3Holder) || t('v3.title');
+  const vs = $('#viewer3d');
+  if (vs.dataset.state === 'intro') open3DIntro();
+  else $('#v3Train').textContent = t(vs.dataset.state === 'error' ? 'v3.retrain' : 'v3.train');
+}
+
 async function init() {
   window.__hmBooted = true;
+  applyStatic();
   bind();
   store.persist();
   await loadDate(store.today());
@@ -1188,5 +1268,5 @@ async function init() {
 init().catch((e) => {
   console.error(e);
   if (window.__hmReport) window.__hmReport('init: ' + (e && (e.stack || e.message)));
-  if (window.__hmShow) window.__hmShow('启动出错：' + (e && e.message));
+  if (window.__hmShow) window.__hmShow(t('err.boot', { m: e && e.message }));
 });

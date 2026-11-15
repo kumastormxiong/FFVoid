@@ -1,5 +1,6 @@
 // Hair-length model: current length (cm) per zone, what each style needs, and growth time.
-import { hairMask } from './vision.js?v=202611101949';
+import { hairMask } from './vision.js?v=202611150506';
+import { t } from './i18n.js?v=202611150506';
 
 export const GROWTH_CM_PER_MONTH = 1.25; // average scalp hair growth
 
@@ -19,14 +20,14 @@ export const NEEDS = {
   comma: { top: 11, side: 4, back: 5 },
   curtain: { top: 15, side: 9, back: 9 },
   spiky: { top: 5, side: 1.5, back: 2 },
-  perm: { top: 7, side: 1, back: 2, service: '烫发' },
-  foil: { top: 6, side: 1, back: 2, service: '烫发' },
+  perm: { top: 7, side: 1, back: 2, service: 'perm' },
+  foil: { top: 6, side: 1, back: 2, service: 'perm' },
   mullet: { top: 7, side: 4, back: 14 },
   wolf: { top: 10, side: 9, back: 16 },
   manbun: { top: 22, side: 0.5, back: 15 },
   longm: { top: 25, side: 25, back: 28 },
-  afro: { top: 9, side: 9, back: 9, service: '烫发' },
-  dreads: { top: 15, side: 15, back: 15, service: '编发/接发' },
+  afro: { top: 9, side: 9, back: 9, service: 'perm' },
+  dreads: { top: 15, side: 15, back: 15, service: 'braidext' },
   ivy: { top: 5, side: 1, back: 1.5 },
   caesar: { top: 3, side: 0.5, back: 0.5 },
   bowl: { top: 6, side: 5, back: 5 },
@@ -45,12 +46,12 @@ export const NEEDS = {
   sideswept: { top: 8, side: 2, back: 3 },
   rocker: { top: 18, side: 16, back: 20 },
   surfer: { top: 18, side: 14, back: 16 },
-  curlym: { top: 12, side: 10, back: 12, service: '烫发' },
+  curlym: { top: 12, side: 10, back: 12, service: 'perm' },
   bunm: { top: 20, side: 14, back: 20 },
   pompundercut: { top: 11, side: 0.5, back: 0.5 },
   hitop: { top: 9, side: 0.5, back: 0.5 },
   tousle: { top: 7, side: 4, back: 5 },
-  wavyshort: { top: 7, side: 3, back: 4, service: '烫发' },
+  wavyshort: { top: 7, side: 3, back: 4, service: 'perm' },
   crewfade: { top: 3, side: 0.3, back: 0.3 },
   pompside: { top: 10, side: 3, back: 4 },
   cropfade: { top: 4, side: 0.5, back: 0.8 },
@@ -70,14 +71,14 @@ export const NEEDS = {
   airbangs: { top: 10, side: 35, back: 40 },
   curtainlong: { top: 14, side: 32, back: 38 },
   straight: { top: 38, side: 38, back: 42 },
-  waves: { top: 32, side: 32, back: 38, service: '烫/卷发' },
-  ripple: { top: 30, side: 32, back: 36, service: '烫发' },
-  curly: { top: 18, side: 18, back: 22, service: '烫发' },
+  waves: { top: 32, side: 32, back: 38, service: 'permcurl' },
+  ripple: { top: 30, side: 32, back: 36, service: 'perm' },
+  curly: { top: 18, side: 18, back: 22, service: 'perm' },
   ponytail: { top: 25, side: 25, back: 30 },
   bun: { top: 22, side: 22, back: 25 },
   halfup: { top: 28, side: 28, back: 32 },
-  braids: { top: 10, side: 10, back: 12, service: '编发/接发' },
-  twinbraids: { top: 30, side: 32, back: 35, service: '编发' },
+  braids: { top: 10, side: 10, back: 12, service: 'braidext' },
+  twinbraids: { top: 30, side: 32, back: 35, service: 'braid' },
   bowlw: { top: 8, side: 6, back: 8 },
   butterfly: { top: 14, side: 16, back: 18 },
   jellyfish: { top: 14, side: 20, back: 22 },
@@ -86,49 +87,57 @@ export const NEEDS = {
   buzzf: { top: 1, side: 0.5, back: 0.5 },
   sidebang_long: { top: 12, side: 18, back: 22 },
   bangs_full: { top: 8, side: 25, back: 32 },
-  curly_bob: { top: 12, side: 12, back: 14, service: '烫发' },
-  wavy_bob: { top: 14, side: 14, back: 16, service: '烫发' },
+  curly_bob: { top: 12, side: 12, back: 14, service: 'perm' },
+  wavy_bob: { top: 14, side: 14, back: 16, service: 'perm' },
   longbob: { top: 22, side: 22, back: 25 },
-  mermaid: { top: 30, side: 30, back: 36, service: '烫发' },
+  mermaid: { top: 30, side: 30, back: 36, service: 'perm' },
   space_bun: { top: 22, side: 20, back: 25 },
   twist_updo: { top: 25, side: 25, back: 28 },
-  frenchbraid: { top: 26, side: 25, back: 30, service: '编发' },
-  cornrows: { top: 14, side: 12, back: 22, service: '编发/接发' },
-  bantu: { top: 12, side: 12, back: 12, service: '编发' },
-  fishtail: { top: 28, side: 28, back: 32, service: '编发' },
+  frenchbraid: { top: 26, side: 25, back: 30, service: 'braid' },
+  cornrows: { top: 14, side: 12, back: 22, service: 'braidext' },
+  bantu: { top: 12, side: 12, back: 12, service: 'braid' },
+  fishtail: { top: 28, side: 28, back: 32, service: 'braid' },
   sidepart_long: { top: 35, side: 35, back: 40 },
-  curtain_bob: { top: 12, side: 14, back: 16, service: '烫发' },
+  curtain_bob: { top: 12, side: 14, back: 16, service: 'perm' },
   pompadour_f: { top: 12, side: 3, back: 4 },
-  pixie_curl: { top: 6, side: 3, back: 4, service: '烫发' },
+  pixie_curl: { top: 6, side: 3, back: 4, service: 'perm' },
   bun_low: { top: 20, side: 20, back: 24 },
   hair_wrap: { top: 22, side: 22, back: 26 },
-  crown_braid: { top: 25, side: 25, back: 30, service: '编发' },
+  crown_braid: { top: 25, side: 25, back: 30, service: 'braid' },
   shag_long: { top: 20, side: 28, back: 34 },
-  soft_waves: { top: 10, side: 10, back: 12, service: '烫发' },
+  soft_waves: { top: 10, side: 10, back: 12, service: 'perm' },
   sleek_bob: { top: 17, side: 17, back: 19 },
   mini_bob: { top: 6, side: 5, back: 6 },
-  bedhead: { top: 12, side: 12, back: 14, service: '烫发' },
+  bedhead: { top: 12, side: 12, back: 14, service: 'perm' },
 };
 
 export const LENGTH_PRESETS = [
-  { zh: '寸头', top: 1, side: 0.6, back: 0.8 },
-  { zh: '短发', top: 5, side: 2, back: 3 },
-  { zh: '中短发', top: 10, side: 7, back: 9 },
-  { zh: '及颌', top: 16, side: 17, back: 18 },
-  { zh: '及肩', top: 26, side: 27, back: 30 },
-  { zh: '长发', top: 40, side: 40, back: 45 },
+  { id: 0, top: 1, side: 0.6, back: 0.8 },
+  { id: 1, top: 5, side: 2, back: 3 },
+  { id: 2, top: 10, side: 7, back: 9 },
+  { id: 3, top: 16, side: 17, back: 18 },
+  { id: 4, top: 26, side: 27, back: 30 },
+  { id: 5, top: 40, side: 40, back: 45 },
 ];
 
-export function describeLength(len) {
-  if (!len) return '未知';
+export function lengthIndex(len) {
+  if (!len) return -1;
   const m = Math.max(len.top, len.side, len.back);
-  if (m < 2) return '寸头';
-  if (m < 6) return '短发';
-  if (m < 13) return '中短发';
-  if (m < 22) return '及颌';
-  if (m < 34) return '及肩';
-  return '长发';
+  if (m < 2) return 0;
+  if (m < 6) return 1;
+  if (m < 13) return 2;
+  if (m < 22) return 3;
+  if (m < 34) return 4;
+  return 5;
 }
+
+export function describeLength(len) {
+  const i = lengthIndex(len);
+  return i < 0 ? t('len.unknown') : t('len.n' + i);
+}
+
+export const presetName = (p) => t('len.n' + p.id);
+export const serviceName = (svc) => (svc ? t('svc.' + svc) : '');
 
 /** Months of growth needed to reach `need` from `cur` (0 = can cut today). */
 export function monthsNeeded(need, cur) {
@@ -141,14 +150,14 @@ export function monthsNeeded(need, cur) {
 
 export function gapDetail(need, cur) {
   const zones = [
-    ['顶部', 'top'],
-    ['两侧', 'side'],
-    ['后部', 'back'],
+    'top',
+    'side',
+    'back',
   ];
   let worst = null;
-  for (const [zh, k] of zones) {
+  for (const k of zones) {
     const g = need[k] - cur[k];
-    if (!worst || g > worst.gap) worst = { zh, gap: g, need: need[k], cur: cur[k] };
+    if (!worst || g > worst.gap) worst = { zone: t('zone.' + k), gap: g, need: need[k], cur: cur[k] };
   }
   return worst;
 }

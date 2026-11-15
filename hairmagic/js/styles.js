@@ -206,21 +206,26 @@ export const STYLES = [
     prompt: "a women's tousled bedhead curls: loose messy curls at shoulder length" },
 ];
 
+import { getLang } from './i18n.js?v=202611150506';
+
+export const colorName = (c) => (c ? (getLang() === 'zh' ? c.zh : c.en) : '');
+export const colorByZh = (zh) => COLORS.concat(RANDOM_COLORS).find((c) => c.zh === zh) || null;
+
 export const COLORS = [
-  { id: 'keep', zh: '原色', hex: null, prompt: '' },
-  { id: 'black', zh: '自然黑', hex: '#1b1a1c', prompt: 'natural jet black' },
-  { id: 'brown', zh: '深棕', hex: '#4a3122', prompt: 'rich dark chocolate brown' },
-  { id: 'chestnut', zh: '栗棕', hex: '#7b4a2b', prompt: 'warm chestnut brown' },
-  { id: 'ash', zh: '亚麻灰', hex: '#9a8f80', prompt: 'cool ash brown with linen tones' },
-  { id: 'blonde', zh: '奶金', hex: '#d9bd8c', prompt: 'creamy honey blonde' },
-  { id: 'platinum', zh: '铂金', hex: '#e8e4dc', prompt: 'icy platinum blonde' },
-  { id: 'silver', zh: '银灰', hex: '#b9bec6', prompt: 'metallic silver grey' },
-  { id: 'wine', zh: '酒红', hex: '#6d1f2e', prompt: 'deep burgundy wine red' },
-  { id: 'copper', zh: '铜橙', hex: '#b5592a', prompt: 'vivid copper ginger' },
-  { id: 'haze', zh: '雾霾蓝', hex: '#5d7390', prompt: 'smoky haze blue' },
-  { id: 'pink', zh: '樱花粉', hex: '#e7a3b6', prompt: 'pastel sakura pink' },
-  { id: 'mint', zh: '薄荷绿', hex: '#8fcdb8', prompt: 'pastel mint green' },
-  { id: 'violet', zh: '幻紫', hex: '#7a5fb0', prompt: 'electric lavender violet' },
+  { id: 'keep', en: 'Original', zh: '原色', hex: null, prompt: '' },
+  { id: 'black', en: 'Natural black', zh: '自然黑', hex: '#1b1a1c', prompt: 'natural jet black' },
+  { id: 'brown', en: 'Dark brown', zh: '深棕', hex: '#4a3122', prompt: 'rich dark chocolate brown' },
+  { id: 'chestnut', en: 'Chestnut', zh: '栗棕', hex: '#7b4a2b', prompt: 'warm chestnut brown' },
+  { id: 'ash', en: 'Ash brown', zh: '亚麻灰', hex: '#9a8f80', prompt: 'cool ash brown with linen tones' },
+  { id: 'blonde', en: 'Honey blonde', zh: '奶金', hex: '#d9bd8c', prompt: 'creamy honey blonde' },
+  { id: 'platinum', en: 'Platinum', zh: '铂金', hex: '#e8e4dc', prompt: 'icy platinum blonde' },
+  { id: 'silver', en: 'Silver grey', zh: '银灰', hex: '#b9bec6', prompt: 'metallic silver grey' },
+  { id: 'wine', en: 'Burgundy', zh: '酒红', hex: '#6d1f2e', prompt: 'deep burgundy wine red' },
+  { id: 'copper', en: 'Copper', zh: '铜橙', hex: '#b5592a', prompt: 'vivid copper ginger' },
+  { id: 'haze', en: 'Haze blue', zh: '雾霾蓝', hex: '#5d7390', prompt: 'smoky haze blue' },
+  { id: 'pink', en: 'Sakura pink', zh: '樱花粉', hex: '#e7a3b6', prompt: 'pastel sakura pink' },
+  { id: 'mint', en: 'Mint green', zh: '薄荷绿', hex: '#8fcdb8', prompt: 'pastel mint green' },
+  { id: 'violet', en: 'Violet', zh: '幻紫', hex: '#7a5fb0', prompt: 'electric lavender violet' },
 ];
 
 // ---- Seeded random style generator -------------------------------------------------
@@ -235,6 +240,37 @@ export function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+const SHORT_EN = {
+  '超短': 'Very short',
+  '短发': 'Short',
+  '及颌': 'Chin-length',
+  '及肩': 'Shoulder-length',
+  '长发': 'Long',
+  '直发': 'Straight',
+  '微卷': 'Soft waves',
+  '卷发': 'Curls',
+  '蓬松纹理': 'Textured',
+  '湿发感': 'Wet look',
+  '无刘海': 'No fringe',
+  '齐刘海': 'Blunt bangs',
+  '空气刘海': 'Wispy bangs',
+  '八字刘海': 'Curtain bangs',
+  '侧分刘海': 'Side fringe',
+  '中分': 'Center part',
+  '侧分': 'Side part',
+  '无分线': 'No part',
+  '后梳': 'Swept back',
+  '两侧渐变': 'Faded sides',
+  '层次剪裁': 'Layered',
+  '半扎发': 'Half-up',
+  '耳后挑染': 'Peekaboo color',
+  '剃线': 'Shaved line',
+  '挂耳': 'Tucked behind ear',
+  '服帖': 'Flat',
+  '自然': 'Natural volume',
+  '高颅顶': 'High crown',
+};
 
 const POOLS = {
   length: [
@@ -283,9 +319,9 @@ const POOLS = {
 
 const RANDOM_COLORS = [
   ...COLORS.filter((c) => c.id !== 'keep'),
-  { id: 'ombre1', zh: '雾蓝渐变', prompt: 'dark roots fading into smoky blue ends (ombre)' },
-  { id: 'ombre2', zh: '粉金渐变', prompt: 'rose gold ombre from brown roots to pink-gold ends' },
-  { id: 'ombre3', zh: '银白挑染', prompt: 'dark hair with fine silver-white highlights' },
+  { id: 'ombre1', en: 'Blue ombre', zh: '雾蓝渐变', prompt: 'dark roots fading into smoky blue ends (ombre)' },
+  { id: 'ombre2', en: 'Rose-gold ombre', zh: '粉金渐变', prompt: 'rose gold ombre from brown roots to pink-gold ends' },
+  { id: 'ombre3', en: 'Silver highlights', zh: '银白挑染', prompt: 'dark hair with fine silver-white highlights' },
 ];
 
 export function randomSeed() {
@@ -313,6 +349,7 @@ export function styleFromSeed(seed, { randomColor = true, allowedLengths = null,
   if (lengthIdx <= 1 && /半扎发|挂耳/.test(detail[0])) detail = ['', ''];
 
   const zhParts = [length[0], texture[0], fringe[0], part[0], volume[0], detail[0]].filter(Boolean);
+  const enParts = zhParts.map((z) => SHORT_EN[z] || z);
   let en = `a ${length[1]} haircut, ${texture[1]} texture, ${fringe[1]}, ${part[1]}, ${volume[1]}`;
   if (detail[1]) en += `, ${detail[1]}`;
   return {
@@ -320,8 +357,9 @@ export function styleFromSeed(seed, { randomColor = true, allowedLengths = null,
     lengthIdx,
     texture: texture[0],
     zh: zhParts.join(' · '),
+    en: enParts.join(' · '),
     prompt: en + (line === 'f' ? " — a fashionable salon-quality women's hairstyle" : " — a fashionable salon-quality men's haircut"),
-    color: color ? { zh: color.zh, prompt: color.prompt, hex: color.hex || null } : null,
+    color: color ? { zh: color.zh, en: color.en, prompt: color.prompt, hex: color.hex || null } : null,
   };
 }
 
