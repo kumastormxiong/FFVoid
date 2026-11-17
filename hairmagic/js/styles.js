@@ -206,7 +206,7 @@ export const STYLES = [
     prompt: "a women's tousled bedhead curls: loose messy curls at shoulder length" },
 ];
 
-import { getLang } from './i18n.js?v=202611150858';
+import { getLang } from './i18n.js?v=202611171342';
 
 export const colorName = (c) => (c ? (getLang() === 'zh' ? c.zh : c.en) : '');
 export const colorByZh = (zh) => COLORS.concat(RANDOM_COLORS).find((c) => c.zh === zh) || null;

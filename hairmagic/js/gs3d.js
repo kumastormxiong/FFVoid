@@ -1,6 +1,6 @@
 // 3D Gaussian Splatting viewer (Spark + three.js): drag to orbit, pinch / wheel to zoom.
 // Reads plain 3DGS .ply and HairMagic .hmg (SPZ splats + hair mask + expression / blink offsets):
-// with .hmg the hair can be recoloured live and the face can smile, frown and blink.
+// with .hmg the face can smile, frown and blink.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SparkRenderer, SplatMesh, toHalf, fromHalf, unpackSplat } from '@sparkjsdev/spark';
@@ -142,7 +142,7 @@ export class SplatViewer {
       try {
         await this.initHmg(hmg);
       } catch (e) {
-        console.warn('hmg extras unavailable', e);       // the head still shows; only dye / expressions are off
+        console.warn('hmg extras unavailable', e);       // the head still shows; only expressions are off
       }
     }
     // fit the head in the narrower of the two field-of-view directions
@@ -160,23 +160,6 @@ export class SplatViewer {
     const ps = this.mesh.packedSplats;
     if (!ps || !ps.packedArray || ps.numSplats !== head.n) throw new Error('splat count mismatch');
     const arr = ps.packedArray;
-    if (head.sections.hair && typeof DecompressionStream !== 'undefined') {
-      const idx = bitsToIndices(await gunzip(sec('hair')), head.n);
-      if (idx.length > 50) {
-        const orig = new Uint8Array(idx.length * 3);
-        const lum = new Float32Array(idx.length);
-        let sum = 0;
-        for (let k = 0; k < idx.length; k++) {
-          const w = arr[idx[k] * 4];
-          const r = w & 255, g = (w >>> 8) & 255, bl = (w >>> 16) & 255;
-          orig[k * 3] = r; orig[k * 3 + 1] = g; orig[k * 3 + 2] = bl;
-          lum[k] = (0.299 * r + 0.587 * g + 0.114 * bl) / 255;
-          sum += lum[k];
-        }
-        this.hair = { idx, orig, lum, mean: Math.max(1e-3, sum / idx.length), dye: null };
-        this.features.hair = true;
-      }
-    }
     if (head.sections.amask && head.targets && head.targets.length && typeof DecompressionStream !== 'undefined') {
       const idx = bitsToIndices(await gunzip(sec('amask')), head.n);
       const M = idx.length;
@@ -286,39 +269,7 @@ export class SplatViewer {
     this.mesh.updateVersion();
   }
 
-  // ---- hair dye ------------------------------------------------------------
-  /** rgb: [r,g,b] 0..1 = average colour the hair should get (null = original); light: -1..1 darker / lighter */
-  setDye(rgb, light = 0) {
-    const h = this.hair;
-    if (!h) return;
-    const ps = this.mesh.packedSplats;
-    const arr = ps.packedArray;
-    const enc = ps.splatEncoding || {};
-    const lo = enc.rgbMin ?? 0, range = (enc.rgbMax ?? 1) - lo;
-    const toU8 = (v) => Math.max(0, Math.min(255, Math.round(((v - lo) / range) * 255)));
-    const lift = Math.pow(2, light);
-    // lighter target colours get less strand contrast (dark hair has strong relative highlights)
-    const tl = rgb ? (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) * lift : 0;
-    const c = Math.min(0.9, Math.max(0.35, 0.95 - 0.7 * tl));
-    const N = h.idx.length;
-    for (let k = 0; k < N; k++) {
-      const i4 = h.idx[k] * 4;
-      let r, g, b;
-      if (!rgb) {
-        r = h.orig[k * 3]; g = h.orig[k * 3 + 1]; b = h.orig[k * 3 + 2];
-      } else {
-        // keep each strand's brightness relative to the hair average, so highlights and shading survive
-        const rel = (1 + (Math.pow(Math.min(2.5, h.lum[k] / h.mean), 0.85) - 1) * c) * lift;
-        r = toU8(rgb[0] * rel); g = toU8(rgb[1] * rel); b = toU8(rgb[2] * rel);
-      }
-      arr[i4] = (r | (g << 8) | (b << 16) | (arr[i4] & 0xff000000)) >>> 0;
-    }
-    h.dye = rgb ? { rgb, light } : null;
-    ps.needsUpdate = true;
-    this.mesh.updateVersion();
-  }
-
-  /** Current splats (with dye and expression) as a standard 3DGS .ply Blob. */
+  /** Current splats (with expression) as a standard 3DGS .ply Blob. */
   exportPly() {
     const ps = this.mesh && this.mesh.packedSplats;
     if (!ps || !ps.packedArray) return null;

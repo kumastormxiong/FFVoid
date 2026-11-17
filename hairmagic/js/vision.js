@@ -1,4 +1,4 @@
-import { t } from './i18n.js?v=202611150858';
+import { t } from './i18n.js?v=202611171342';
 // On-device vision: MediaPipe face landmarks (478 pts + head pose) and hair segmentation.
 // MediaPipe is loaded lazily so the rest of the app works even if it cannot load on a device
 let MP = null;
